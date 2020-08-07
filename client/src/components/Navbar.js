@@ -1,37 +1,7 @@
-import React, { useState } from 'react';
-import {
-  Collapse,
-  Navbar,
-  NavbarToggler,
-  NavbarBrand,
-  Nav,
-  NavItem,
-  NavLink,
-} from 'reactstrap';
+import React from 'react';
 
-const Example = (props) => {
-  const [isOpen, setIsOpen] = useState(false);
+function Navbar(props) {
+  return <div>Navbar</div>;
+}
 
-  const toggle = () => setIsOpen(!isOpen);
-
-  return (
-    <div>
-      <Navbar color="light" light expand="md">
-        <NavbarBrand href="/">Video Meetings App</NavbarBrand>
-        <NavbarToggler onClick={toggle} />
-        <Collapse isOpen={isOpen} navbar>
-          <Nav className="mr-auto" navbar>
-            <NavItem>
-              <NavLink href="/components/">Homepage</NavLink>
-            </NavItem>
-            <NavItem>
-              <NavLink href="/how-it-works">How it works</NavLink>
-            </NavItem>
-          </Nav>
-        </Collapse>
-      </Navbar>
-    </div>
-  );
-};
-
-export default Example;
+export default Navbar;
