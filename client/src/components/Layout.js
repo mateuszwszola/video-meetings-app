@@ -3,7 +3,7 @@ import Header from 'components/layout/Header';
 import Footer from 'components/layout/Footer';
 
 const Layout = ({ children }) => (
-  <div className="w-full min-h-screen flex flex-col flex-1">
+  <div className="w-full min-h-screen flex flex-col flex-1 text-base lg:text-lg">
     <Header />
     <main className="px-2 w-full max-w-screen-xl mx-auto flex flex-col flex-1">
       {children}
