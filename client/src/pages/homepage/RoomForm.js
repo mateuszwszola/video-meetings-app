@@ -11,7 +11,7 @@ const RoomForm = () => {
   };
 
   return (
-    <div className="mt-16 max-w-xs w-full mx-auto">
+    <div className="mt-16 max-w-xs lg:max-w-sm w-full mx-auto">
       <form onSubmit={handleSubmit} className="w-full flex flex-col">
         <label className="sr-only" htmlFor="roomName">
           {createRoom ? 'Create a room' : 'Join a room'}
