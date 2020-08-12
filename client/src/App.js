@@ -1,25 +1,14 @@
-import React, { useEffect } from 'react';
-// import socketIOClient from 'socket.io-client';
+import React from 'react';
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom';
 import Layout from 'components/Layout';
 import Homepage from 'pages/Homepage';
 import HowItWorks from 'pages/HowItWorks';
 import About from 'pages/About';
+import Room from 'pages/Room';
 import NotFound from 'pages/NotFound';
-
-// const ENDPOINT = 'http://127.0.0.1:3001';
+import { SocketProvider } from 'context/SocketContext';
 
 function App() {
-  // useEffect(() => {
-  //   const socket = socketIOClient(ENDPOINT);
-  //   socket.on('PULSE', (msg) => {
-  //     console.log(msg);
-  //   });
-  //   return () => {
-  //     socket.disconnect();
-  //   };
-  // }, []);
-
   return (
     <Router>
       <Layout>
@@ -32,6 +21,11 @@ function App() {
           </Route>
           <Route path="/about">
             <About />
+          </Route>
+          <Route path="/:roomName">
+            <SocketProvider>
+              <Room />
+            </SocketProvider>
           </Route>
           <NotFound />
         </Switch>

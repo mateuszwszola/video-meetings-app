@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
+import { useHistory } from 'react-router-dom';
 
 const RoomForm = () => {
   const [createRoom, setCreateRoom] = useState(true);
+  const [roomName, setRoomName] = useState('');
+  const history = useHistory();
 
   const toggleEnterRoom = () => setCreateRoom((prevState) => !prevState);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('The form has been submitted');
+    if (!createRoom) return;
+    history.push('/' + roomName);
   };
 
   return (
@@ -18,6 +22,8 @@ const RoomForm = () => {
         </label>
         <div className="flex flex-col w-full items-center px-2 max-w-screen-sm">
           <input
+            value={roomName}
+            onChange={(e) => setRoomName(e.target.value)}
             className="w-full rounded py-2 px-4 bg-gray-100 border border-gray-300"
             type="text"
             id="roomName"
