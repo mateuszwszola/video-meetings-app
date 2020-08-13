@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './tailwind.output.css';
+import 'webrtc-adapter';
 import App from './App';
 
 ReactDOM.render(

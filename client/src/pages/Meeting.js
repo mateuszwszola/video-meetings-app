@@ -1,26 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { disconnectSocket, initiateSocket } from 'utils/socket';
-import adapter from 'webrtc-adapter';
+import { initiateSocket, disconnectSocket } from 'utils/socket';
+import { openUserMedia } from 'utils/webrtc';
+import { peerConfiguration } from 'config';
 
-const peerConfiguration = {
-  iceServers: [
-    {
-      urls: 'stun:stun.stunprotocol.org',
-    },
-  ],
-};
-
-const mediaConstraints = {
-  audio: true,
-  video: true,
-};
-
-function openUserMedia() {
-  return navigator.mediaDevices.getUserMedia(mediaConstraints);
-}
-
-const Room = () => {
+function Meeting() {
   const { roomName } = useParams();
   const socketRef = useRef();
   const peerConnectionRef = useRef();
@@ -29,6 +13,8 @@ const Room = () => {
   const remoteVideoRef = useRef();
   const remoteUserRef = useRef();
 
+  const [btnDisabled, setBtnDisabled] = useState(true);
+
   useEffect(() => {
     openUserMedia()
       .then((mediaStream) => {
@@ -36,7 +22,6 @@ const Room = () => {
         localVideoRef.current.srcObject = mediaStream;
 
         const socket = initiateSocket(roomName);
-        socketRef.current = socket;
 
         socket.on('RECIPIENT', (remoteUserId) => {
           remoteUserRef.current = remoteUserId;
@@ -47,11 +32,15 @@ const Room = () => {
           remoteUserRef.current = remoteUserId;
         });
 
+        socket.on('HANG_UP', handleHangUpReceive);
+
         socket.on('OFFER', handleOfferReceive);
 
         socket.on('ANSWER', handleAnswerReceive);
 
         socket.on('NEW_ICE_CANDIDATE', handleNewICECandidate);
+
+        socketRef.current = socket;
       })
       .catch(handleGetUserMediaError);
 
@@ -60,35 +49,20 @@ const Room = () => {
     };
   }, [roomName]);
 
-  function handleGetUserMediaError(e) {
-    if (e.name === 'NotFoundError') {
-      console.error(
-        'Unable to open your call because no camera and/or microphone were found'
-      );
-    } else if (
-      e.name === 'SecurityError' ||
-      e.name === 'PermissionDeniedError'
-    ) {
-      console.log('User cancelled the call');
-    } else {
-      console.error(
-        'Error opening your camera and/or microphone: ' + e.message
-      );
-    }
-
-    closeVideoCall();
-  }
-
   function callUser() {
     if (peerConnectionRef.current) return;
 
     peerConnectionRef.current = createPeerConnection();
 
-    localMediaStreamRef.current
-      .getTracks()
-      .forEach((track) =>
-        peerConnectionRef.current.addTrack(track, localMediaStreamRef.current)
-      );
+    try {
+      localMediaStreamRef.current
+        .getTracks()
+        .forEach((track) =>
+          peerConnectionRef.current.addTrack(track, localMediaStreamRef.current)
+        );
+    } catch (error) {
+      handleGetUserMediaError(error);
+    }
   }
 
   function createPeerConnection() {
@@ -96,17 +70,15 @@ const Room = () => {
 
     peer.onicecandidate = handleICECandidateEvent;
     peer.ontrack = handleTrackEvent;
-    peer.onnegotiationneeded = handleNegotiationNeeded;
+    peer.onnegotiationneeded = handleNegotiationNeededEvent;
 
     peer.onremovetrack = handleRemoveTrackEvent;
     peer.oniceconnectionstatechange = handleICEConnectionStateChangeEvent;
 
-    peerConnectionRef.current = peer;
-
     return peer;
   }
 
-  async function handleNegotiationNeeded() {
+  async function handleNegotiationNeededEvent() {
     try {
       const offer = await peerConnectionRef.current.createOffer();
 
@@ -127,7 +99,7 @@ const Room = () => {
 
   function handleTrackEvent(e) {
     remoteVideoRef.current.srcObject = e.streams[0];
-    // TODO: set button disabled prop to false
+    setBtnDisabled(false);
   }
 
   function handleICECandidateEvent(e) {
@@ -147,9 +119,11 @@ const Room = () => {
   }
 
   function handleICEConnectionStateChangeEvent(e) {
+    const currentState = peerConnectionRef.current.iceConnectionState;
     if (
-      peerConnectionRef.current.iceConnectionState === 'closed' ||
-      peerConnectionRef.current.iceConnectionState === 'failed'
+      currentState === 'closed' ||
+      currentState === 'failed' ||
+      currentState === 'disconnected'
     ) {
       closeVideoCall();
     }
@@ -157,12 +131,16 @@ const Room = () => {
 
   async function handleNewICECandidate(payload) {
     const candidate = new RTCIceCandidate(payload);
-    await peerConnectionRef.current.addIceCandidate(candidate);
+    await peerConnectionRef.current
+      .addIceCandidate(candidate)
+      .catch(console.error);
   }
 
   async function handleAnswerReceive(payload) {
     const desc = new RTCSessionDescription(payload.sdp);
-    await peerConnectionRef.current.setRemoteDescription(desc);
+    await peerConnectionRef.current
+      .setRemoteDescription(desc)
+      .catch(console.error);
   }
 
   async function handleOfferReceive(payload) {
@@ -229,14 +207,40 @@ const Room = () => {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
       localMediaStreamRef.current = null;
+
+      setBtnDisabled(true);
     }
   }
 
-  function handleHangUpCall() {
+  function handleHangUp() {
     closeVideoCall();
+
     socketRef.current.emit('HANG_UP', {
       target: remoteUserRef.current,
     });
+  }
+
+  function handleHangUpReceive() {
+    closeVideoCall();
+  }
+
+  function handleGetUserMediaError(e) {
+    if (e.name === 'NotFoundError') {
+      console.error(
+        'Unable to open your call because no camera and/or microphone were found'
+      );
+    } else if (
+      e.name === 'SecurityError' ||
+      e.name === 'PermissionDeniedError'
+    ) {
+      console.log('User cancelled the call');
+    } else {
+      console.error(
+        'Error opening your camera and/or microphone: ' + e.message
+      );
+    }
+
+    closeVideoCall();
   }
 
   return (
@@ -245,11 +249,15 @@ const Room = () => {
       <video ref={remoteVideoRef} autoPlay />
       <video ref={localVideoRef} muted autoPlay />
 
-      <button onClick={handleHangUpCall} disabled={!peerConnectionRef.current}>
+      <button
+        className="m-2 rounded bg-red-500 text-white py-2 px-4"
+        onClick={handleHangUp}
+        disabled={btnDisabled}
+      >
         Hang Up
       </button>
     </div>
   );
-};
+}
 
-export default Room;
+export default Meeting;

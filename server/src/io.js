@@ -58,6 +58,10 @@ exports.initialize = function (server) {
       }
     });
 
+    socket.on('HANG_UP', (payload) => {
+      io.to(payload.target).emit('HANG_UP');
+    });
+
     socket.on('OFFER', (payload) => {
       io.to(payload.target).emit('OFFER', payload);
     });

@@ -4,7 +4,7 @@ import Layout from 'components/Layout';
 import Homepage from 'pages/Homepage';
 import HowItWorks from 'pages/HowItWorks';
 import About from 'pages/About';
-import Room from 'pages/Room';
+import Meeting from 'pages/Meeting';
 import NotFound from 'pages/NotFound';
 import { SocketProvider } from 'context/SocketContext';
 
@@ -24,7 +24,7 @@ function App() {
           </Route>
           <Route path="/:roomName">
             <SocketProvider>
-              <Room />
+              <Meeting />
             </SocketProvider>
           </Route>
           <NotFound />
