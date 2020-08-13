@@ -1,19 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useEffect, useRef } from 'react';
+import { useParams, useHistory } from 'react-router-dom';
 import { initiateSocket, disconnectSocket } from 'utils/socket';
 import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
 
 function Meeting() {
   const { roomName } = useParams();
+  const history = useHistory();
   const socketRef = useRef();
   const peerConnectionRef = useRef();
   const localMediaStreamRef = useRef();
   const localVideoRef = useRef();
   const remoteVideoRef = useRef();
   const remoteUserRef = useRef();
-
-  const [btnDisabled, setBtnDisabled] = useState(true);
 
   useEffect(() => {
     openUserMedia()
@@ -32,7 +31,9 @@ function Meeting() {
           remoteUserRef.current = remoteUserId;
         });
 
-        socket.on('HANG_UP', handleHangUpReceive);
+        socket.on('USER_DISCONNECTED', (userId) => {
+          handleCloseConnection(userId);
+        });
 
         socket.on('OFFER', handleOfferReceive);
 
@@ -45,6 +46,7 @@ function Meeting() {
       .catch(handleGetUserMediaError);
 
     return () => {
+      handleCloseVideoCall();
       disconnectSocket();
     };
   }, [roomName]);
@@ -60,8 +62,8 @@ function Meeting() {
         .forEach((track) =>
           peerConnectionRef.current.addTrack(track, localMediaStreamRef.current)
         );
-    } catch (error) {
-      handleGetUserMediaError(error);
+    } catch (err) {
+      handleGetUserMediaError(err);
     }
   }
 
@@ -79,6 +81,8 @@ function Meeting() {
   }
 
   async function handleNegotiationNeededEvent() {
+    if (!peerConnectionRef.current) return;
+
     try {
       const offer = await peerConnectionRef.current.createOffer();
 
@@ -99,7 +103,6 @@ function Meeting() {
 
   function handleTrackEvent(e) {
     remoteVideoRef.current.srcObject = e.streams[0];
-    setBtnDisabled(false);
   }
 
   function handleICECandidateEvent(e) {
@@ -114,18 +117,18 @@ function Meeting() {
   function handleRemoveTrackEvent() {
     const trackList = remoteVideoRef.current.getTracks();
     if (trackList.length === 0) {
-      closeVideoCall();
+      handleCloseConnection(remoteUserRef.current);
     }
   }
 
-  function handleICEConnectionStateChangeEvent(e) {
+  function handleICEConnectionStateChangeEvent() {
     const currentState = peerConnectionRef.current.iceConnectionState;
     if (
       currentState === 'closed' ||
       currentState === 'failed' ||
       currentState === 'disconnected'
     ) {
-      closeVideoCall();
+      handleCloseConnection(remoteUserRef.current);
     }
   }
 
@@ -150,15 +153,7 @@ function Meeting() {
 
     const desc = new RTCSessionDescription(payload.sdp);
 
-    if (peerConnectionRef.current.signalingState !== 'stable') {
-      await Promise.all([
-        peerConnectionRef.current.setLocalDescription({ type: 'rollback' }),
-        peerConnectionRef.current.setRemoteDescription(desc),
-      ]);
-      return;
-    } else {
-      await peerConnectionRef.current.setRemoteDescription(desc);
-    }
+    await peerConnectionRef.current.setRemoteDescription(desc);
 
     try {
       localMediaStreamRef.current
@@ -166,8 +161,8 @@ function Meeting() {
         .forEach((track) =>
           peerConnectionRef.current.addTrack(track, localMediaStreamRef.current)
         );
-    } catch (error) {
-      handleGetUserMediaError(error);
+    } catch (err) {
+      handleGetUserMediaError(err);
     }
 
     const answer = await peerConnectionRef.current.createAnswer();
@@ -179,49 +174,31 @@ function Meeting() {
     });
   }
 
-  function closeVideoCall() {
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.ontrack = null;
-      peerConnectionRef.current.onicecandidate = null;
-      peerConnectionRef.current.onnegotiationneeded = null;
-      peerConnectionRef.current.onremovetrack = null;
-      peerConnectionRef.current.oniceconnectionstatechange = null;
-
-      if (remoteVideoRef.current.srcObject) {
-        remoteVideoRef.current.srcObject
-          .getTracks()
-          .forEach((track) => track.stop());
-      }
-
-      if (localVideoRef.current.srcObject) {
-        localVideoRef.current.srcObject
-          .getTracks()
-          .forEach((track) => track.stop());
-      }
-
-      remoteVideoRef.current.removeAttribute('src');
-      remoteVideoRef.current.removeAttribute('srcObject');
-      localVideoRef.current.removeAttribute('src');
-      localVideoRef.current.removeAttribute('srcObject');
-
-      peerConnectionRef.current.close();
-      peerConnectionRef.current = null;
-      localMediaStreamRef.current = null;
-
-      setBtnDisabled(true);
+  function handleCloseVideoCall() {
+    if (localVideoRef.current && localVideoRef.current.srcObject) {
+      localVideoRef.current.pause();
+      localVideoRef.current.srcObject.getTracks().forEach((track) => {
+        track.stop();
+      });
     }
+
+    localMediaStreamRef.current = null;
   }
 
-  function handleHangUp() {
-    closeVideoCall();
+  function handleCloseConnection(remoteUserId) {
+    if (remoteUserRef.current !== remoteUserId || !peerConnectionRef.current)
+      return;
 
-    socketRef.current.emit('HANG_UP', {
-      target: remoteUserRef.current,
-    });
-  }
+    peerConnectionRef.current.ontrack = null;
+    peerConnectionRef.current.onicecandidate = null;
+    peerConnectionRef.current.onnegotiationneeded = null;
+    peerConnectionRef.current.onremovetrack = null;
+    peerConnectionRef.current.oniceconnectionstatechange = null;
 
-  function handleHangUpReceive() {
-    closeVideoCall();
+    peerConnectionRef.current.close();
+    peerConnectionRef.current = null;
+
+    remoteUserRef.current = null;
   }
 
   function handleGetUserMediaError(e) {
@@ -240,21 +217,32 @@ function Meeting() {
       );
     }
 
-    closeVideoCall();
+    handleCloseConnection(remoteUserRef.current);
+  }
+
+  function handleRoomLeave() {
+    history.push('/');
   }
 
   return (
     <div className="sm:mt-40">
-      <h2>Meeting</h2>
-      <video ref={remoteVideoRef} autoPlay />
-      <video ref={localVideoRef} muted autoPlay />
+      <h2 className="m-2">{roomName}</h2>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-auto">
+        <video
+          className="w-full max-w-full"
+          ref={localVideoRef}
+          muted
+          autoPlay
+        />
+        <video className="w-full max-w-full" ref={remoteVideoRef} autoPlay />
+      </div>
 
       <button
         className="m-2 rounded bg-red-500 text-white py-2 px-4"
-        onClick={handleHangUp}
-        disabled={btnDisabled}
+        onClick={handleRoomLeave}
       >
-        Hang Up
+        Leave Room
       </button>
     </div>
   );

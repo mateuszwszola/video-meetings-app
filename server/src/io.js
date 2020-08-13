@@ -22,6 +22,7 @@ exports.initialize = function (server) {
       }
 
       Object.keys(socket.rooms).forEach((room) => {
+        socket.to(room).emit('USER_DISCONNECTED', socket.id);
         if (rooms.has(room)) {
           rooms.set(
             room,
@@ -56,10 +57,6 @@ exports.initialize = function (server) {
         socket.emit('RECIPIENT', recipient);
         socket.to(room).emit('USER_JOINED', socket.id);
       }
-    });
-
-    socket.on('HANG_UP', (payload) => {
-      io.to(payload.target).emit('HANG_UP');
     });
 
     socket.on('OFFER', (payload) => {

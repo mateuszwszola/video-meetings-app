@@ -8,7 +8,7 @@ const Header = () => {
   const toggleDropdown = () => setShowDropdown((on) => !on);
 
   return (
-    <header className="sm:fixed w-full p-6 sm:p-12">
+    <header className="sm:fixed w-full p-6">
       <nav className="w-full max-w-screen-xl mx-auto flex flex-col items-center sm:flex-row sm:justify-between">
         <div className="w-full sm:w-auto flex items-center relative">
           <CustomNavLink to="/">Home</CustomNavLink>

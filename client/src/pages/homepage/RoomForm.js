@@ -24,7 +24,7 @@ const RoomForm = () => {
           <input
             value={roomName}
             onChange={(e) => setRoomName(e.target.value)}
-            className="w-full rounded py-2 px-4 bg-gray-100 border border-gray-300"
+            className="w-full rounded py-2 px-4 bg-gray-100 border border-gray-300 outline-none focus:shadow-outline"
             type="text"
             id="roomName"
             name="roomName"

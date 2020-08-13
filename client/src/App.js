@@ -6,7 +6,6 @@ import HowItWorks from 'pages/HowItWorks';
 import About from 'pages/About';
 import Meeting from 'pages/Meeting';
 import NotFound from 'pages/NotFound';
-import { SocketProvider } from 'context/SocketContext';
 
 function App() {
   return (
@@ -23,9 +22,7 @@ function App() {
             <About />
           </Route>
           <Route path="/:roomName">
-            <SocketProvider>
-              <Meeting />
-            </SocketProvider>
+            <Meeting />
           </Route>
           <NotFound />
         </Switch>
