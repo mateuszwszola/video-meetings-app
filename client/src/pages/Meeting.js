@@ -1,37 +1,44 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import { initiateSocket, disconnectSocket } from 'utils/socket';
 import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
+import Video from 'pages/meeting/Video';
 
 function Meeting() {
   const { roomName } = useParams();
   const history = useHistory();
-  const socketRef = useRef();
-  const peerConnectionRef = useRef();
-  const localMediaStreamRef = useRef();
-  const localVideoRef = useRef();
-  const remoteVideoRef = useRef();
-  const remoteUserRef = useRef();
+  const socketRef = useRef(null);
+  const localMediaStreamRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const peerConnectionsRef = useRef({});
+  const [peerConnections, setPeerConnections] = useState([]);
 
   useEffect(() => {
+    const socket = initiateSocket();
+
     openUserMedia()
       .then((mediaStream) => {
         localMediaStreamRef.current = mediaStream;
         localVideoRef.current.srcObject = mediaStream;
 
-        const socket = initiateSocket(roomName);
+        socket.emit('JOIN_ROOM', { room: roomName });
 
-        socket.on('RECIPIENT', (remoteUserId) => {
-          remoteUserRef.current = remoteUserId;
-          callUser();
+        socket.on('RECIPIENT', (recipientsIds) => {
+          console.log('RECIPIENT triggered', recipientsIds);
+          callUsers(recipientsIds);
         });
 
-        socket.on('USER_JOINED', (remoteUserId) => {
-          remoteUserRef.current = remoteUserId;
+        socket.on('OWNER', () => {
+          console.log('OWNER event triggered');
+        });
+
+        socket.on('USER_JOINED', (userId) => {
+          console.log(`USER_JOINED event triggered for ${userId}`);
         });
 
         socket.on('USER_DISCONNECTED', (userId) => {
+          console.log(`USER_DISCONNECTED event triggered for ${userId}`);
           handleCloseConnection(userId);
         });
 
@@ -51,125 +58,143 @@ function Meeting() {
     };
   }, [roomName]);
 
-  function callUser() {
-    if (peerConnectionRef.current) return;
+  function callUsers(remoteUsersIds) {
+    const peers = [];
 
-    peerConnectionRef.current = createPeerConnection();
+    const localTracks = localMediaStreamRef.current.getTracks();
 
-    try {
-      localMediaStreamRef.current
-        .getTracks()
-        .forEach((track) =>
-          peerConnectionRef.current.addTrack(track, localMediaStreamRef.current)
+    remoteUsersIds.forEach((userId) => {
+      const peer = createPeerConnection(userId);
+
+      try {
+        localTracks.forEach((track) =>
+          peer.addTrack(track, localMediaStreamRef.current)
         );
-    } catch (err) {
-      handleGetUserMediaError(err);
-    }
+      } catch (err) {
+        handleGetUserMediaError(err);
+      }
+
+      peerConnectionsRef.current[userId] = peer;
+      peers.push(peer);
+    });
+
+    setPeerConnections(peers);
   }
 
-  function createPeerConnection() {
+  function createPeerConnection(userId) {
     const peer = new RTCPeerConnection(peerConfiguration);
 
-    peer.onicecandidate = handleICECandidateEvent;
-    peer.ontrack = handleTrackEvent;
-    peer.onnegotiationneeded = handleNegotiationNeededEvent;
+    peer.onicecandidate = (e) => handleICECandidateEvent(e, userId);
+    peer.onnegotiationneeded = (e) => handleNegotiationNeededEvent(e, userId);
 
-    peer.onremovetrack = handleRemoveTrackEvent;
-    peer.oniceconnectionstatechange = handleICEConnectionStateChangeEvent;
+    peer.onremovetrack = (e) => handleRemoveTrackEvent(e, userId);
+    peer.oniceconnectionstatechange = (e) =>
+      handleICEConnectionStateChangeEvent(e, userId);
 
     return peer;
   }
 
-  async function handleNegotiationNeededEvent() {
-    if (!peerConnectionRef.current) return;
+  async function handleNegotiationNeededEvent(e, userId) {
+    if (!peerConnectionsRef.current[userId]) return;
 
     try {
-      const offer = await peerConnectionRef.current.createOffer();
+      const offer = await peerConnectionsRef.current[userId].createOffer();
 
-      if (peerConnectionRef.current.signalingState !== 'stable') {
+      if (peerConnectionsRef.current[userId].signalingState !== 'stable') {
         return;
       }
 
-      await peerConnectionRef.current.setLocalDescription(offer);
+      await peerConnectionsRef.current[userId].setLocalDescription(offer);
 
       socketRef.current.emit('OFFER', {
-        target: remoteUserRef.current,
-        sdp: peerConnectionRef.current.localDescription,
+        target: userId,
+        caller: socketRef.current.id,
+        sdp: peerConnectionsRef.current[userId].localDescription,
       });
     } catch (error) {
       console.error(error);
     }
   }
 
-  function handleTrackEvent(e) {
-    remoteVideoRef.current.srcObject = e.streams[0];
-  }
-
-  function handleICECandidateEvent(e) {
+  function handleICECandidateEvent(e, userId) {
     if (e.candidate) {
       socketRef.current.emit('NEW_ICE_CANDIDATE', {
-        target: remoteUserRef.current,
+        target: userId,
+        caller: socketRef.current.id,
         candidate: e.candidate,
       });
     }
   }
 
-  function handleRemoveTrackEvent() {
-    const trackList = remoteVideoRef.current.getTracks();
-    if (trackList.length === 0) {
-      handleCloseConnection(remoteUserRef.current);
-    }
+  function handleRemoveTrackEvent(e, userId) {
+    // const mediaTracks =
+    //   peerConnectionsRef.current[userId] &&
+    //   peerConnectionsRef.current[userId].getTracks();
+    // if (mediaTracks && mediaTracks.length === 0) {
+    //   handleCloseConnection(userId);
+    // }
   }
 
-  function handleICEConnectionStateChangeEvent() {
-    const currentState = peerConnectionRef.current.iceConnectionState;
+  function handleICEConnectionStateChangeEvent(e, userId) {
+    const currentState = peerConnectionsRef.current[userId].iceConnectionState;
+
     if (
       currentState === 'closed' ||
       currentState === 'failed' ||
       currentState === 'disconnected'
     ) {
-      handleCloseConnection(remoteUserRef.current);
+      handleCloseConnection(userId);
     }
   }
 
   async function handleNewICECandidate(payload) {
-    const candidate = new RTCIceCandidate(payload);
-    await peerConnectionRef.current
+    const candidate = new RTCIceCandidate(payload.candidate);
+    await peerConnectionsRef.current[payload.caller]
       .addIceCandidate(candidate)
       .catch(console.error);
   }
 
   async function handleAnswerReceive(payload) {
     const desc = new RTCSessionDescription(payload.sdp);
-    await peerConnectionRef.current
+    await peerConnectionsRef.current[payload.caller]
       .setRemoteDescription(desc)
       .catch(console.error);
   }
 
   async function handleOfferReceive(payload) {
-    if (!peerConnectionRef.current) {
-      peerConnectionRef.current = createPeerConnection();
+    if (!peerConnectionsRef.current[payload.caller]) {
+      const peer = createPeerConnection(payload.caller);
+      peerConnectionsRef.current[payload.caller] = peer;
+      setPeerConnections((prevState) => [...prevState, peer]);
     }
 
     const desc = new RTCSessionDescription(payload.sdp);
 
-    await peerConnectionRef.current.setRemoteDescription(desc);
+    await peerConnectionsRef.current[payload.caller].setRemoteDescription(desc);
 
     try {
       localMediaStreamRef.current
         .getTracks()
         .forEach((track) =>
-          peerConnectionRef.current.addTrack(track, localMediaStreamRef.current)
+          peerConnectionsRef.current[payload.caller].addTrack(
+            track,
+            localMediaStreamRef.current
+          )
         );
     } catch (err) {
       handleGetUserMediaError(err);
     }
 
-    const answer = await peerConnectionRef.current.createAnswer();
-    await peerConnectionRef.current.setLocalDescription(answer);
+    const answer = await peerConnectionsRef.current[
+      payload.caller
+    ].createAnswer();
+    await peerConnectionsRef.current[payload.caller].setLocalDescription(
+      answer
+    );
 
     socketRef.current.emit('ANSWER', {
-      target: remoteUserRef.current,
+      target: payload.caller,
+      caller: socketRef.current.id,
       sdp: answer,
     });
   }
@@ -185,20 +210,23 @@ function Meeting() {
     localMediaStreamRef.current = null;
   }
 
-  function handleCloseConnection(remoteUserId) {
-    if (remoteUserRef.current !== remoteUserId || !peerConnectionRef.current)
-      return;
+  function handleCloseConnection(userId) {
+    if (!Array.isArray(userId)) {
+      userId = [userId];
+    }
 
-    peerConnectionRef.current.ontrack = null;
-    peerConnectionRef.current.onicecandidate = null;
-    peerConnectionRef.current.onnegotiationneeded = null;
-    peerConnectionRef.current.onremovetrack = null;
-    peerConnectionRef.current.oniceconnectionstatechange = null;
+    userId.forEach((id) => {
+      if (!peerConnectionsRef.current[id]) return;
 
-    peerConnectionRef.current.close();
-    peerConnectionRef.current = null;
+      peerConnectionsRef.current[id].ontrack = null;
+      peerConnectionsRef.current[id].onicecandidate = null;
+      peerConnectionsRef.current[id].onnegotiationneeded = null;
+      peerConnectionsRef.current[id].onremovetrack = null;
+      peerConnectionsRef.current[id].oniceconnectionstatechange = null;
 
-    remoteUserRef.current = null;
+      peerConnectionsRef.current[id].close();
+      peerConnectionsRef.current[id] = null;
+    });
   }
 
   function handleGetUserMediaError(e) {
@@ -217,7 +245,7 @@ function Meeting() {
       );
     }
 
-    handleCloseConnection(remoteUserRef.current);
+    handleCloseConnection(peerConnections);
   }
 
   function handleRoomLeave() {
@@ -234,8 +262,11 @@ function Meeting() {
           ref={localVideoRef}
           muted
           autoPlay
+          playsInline
         />
-        <video className="w-full max-w-full" ref={remoteVideoRef} autoPlay />
+        {peerConnections.map((peer, index) => (
+          <Video key={index} peer={peer} />
+        ))}
       </div>
 
       <button

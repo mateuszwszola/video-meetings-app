@@ -3,11 +3,8 @@ import { API_URL } from 'config';
 
 let socket;
 
-export const initiateSocket = (room) => {
+export const initiateSocket = () => {
   socket = io(API_URL);
-  if (socket && room) {
-    socket.emit('JOIN_ROOM', { room });
-  }
   return socket;
 };
 

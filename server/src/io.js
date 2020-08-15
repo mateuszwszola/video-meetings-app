@@ -16,47 +16,50 @@ exports.initialize = function (server) {
   io.on('connection', (socket) => {
     debug(`A user connected with ${socket.id}`);
 
-    socket.on('disconnecting', () => {
-      if (users.has(socket.id)) {
-        users.set(socket.id, []);
-      }
+    users.set(socket.id, []);
 
-      Object.keys(socket.rooms).forEach((room) => {
+    socket.on('disconnect', () => {
+      debug(`A user disconnected with ${socket.id}`);
+
+      users.get(socket.id).forEach((room) => {
         socket.to(room).emit('USER_DISCONNECTED', socket.id);
         if (rooms.has(room)) {
           rooms.set(
             room,
-            rooms.get(room).filter((user) => user !== socket.id)
+            rooms.get(room).filter((userId) => userId !== socket.id)
           );
         }
       });
+
+      users.delete(socket.id);
+
+      console.log({ users, rooms });
     });
 
-    socket.on('disconnect', () => {
-      debug(`A user disconnected with ${socket.id}`);
-    });
-
-    socket.on('JOIN_ROOM', (data) => {
-      debug(`JOIN_ROOM triggered for ${socket.id}`);
-
-      const { room } = data;
+    socket.on('JOIN_ROOM', ({ room }) => {
+      debug(`JOIN_ROOM ${room} triggered for ${socket.id}`);
 
       socket.join(room);
 
-      users.set(socket.id, [...Object.keys(socket.rooms)]);
+      users.set(socket.id, [...users.get(socket.id), room]);
 
       if (rooms.has(room)) {
         rooms.set(room, [...rooms.get(room), socket.id]);
       } else {
         rooms.set(room, [socket.id]);
+        socket.emit('OWNER');
       }
 
-      const recipient = rooms.get(room).find((id) => id !== socket.id);
+      const recipients = rooms
+        .get(room)
+        .filter((userId) => userId !== socket.id);
 
-      if (recipient) {
-        socket.emit('RECIPIENT', recipient);
+      if (recipients.length > 0) {
+        socket.emit('RECIPIENT', recipients);
         socket.to(room).emit('USER_JOINED', socket.id);
       }
+
+      console.log({ users, rooms, recipients });
     });
 
     socket.on('OFFER', (payload) => {
@@ -68,7 +71,7 @@ exports.initialize = function (server) {
     });
 
     socket.on('NEW_ICE_CANDIDATE', (payload) => {
-      io.to(payload.target).emit('NEW_ICE_CANDIDATE', payload.candidate);
+      io.to(payload.target).emit('NEW_ICE_CANDIDATE', payload);
     });
   });
 };
