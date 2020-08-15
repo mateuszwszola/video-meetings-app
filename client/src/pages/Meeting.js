@@ -75,7 +75,7 @@ function Meeting() {
       }
 
       peerConnectionsRef.current[userId] = peer;
-      peers.push(peer);
+      peers.push({ userId, peer });
     });
 
     setPeerConnections(peers);
@@ -165,7 +165,10 @@ function Meeting() {
     if (!peerConnectionsRef.current[payload.caller]) {
       const peer = createPeerConnection(payload.caller);
       peerConnectionsRef.current[payload.caller] = peer;
-      setPeerConnections((prevState) => [...prevState, peer]);
+      setPeerConnections((prevState) => [
+        ...prevState,
+        { userId: payload.caller, peer },
+      ]);
     }
 
     const desc = new RTCSessionDescription(payload.sdp);
@@ -211,22 +214,20 @@ function Meeting() {
   }
 
   function handleCloseConnection(userId) {
-    if (!Array.isArray(userId)) {
-      userId = [userId];
-    }
+    if (!peerConnectionsRef.current[userId]) return;
 
-    userId.forEach((id) => {
-      if (!peerConnectionsRef.current[id]) return;
+    peerConnectionsRef.current[userId].ontrack = null;
+    peerConnectionsRef.current[userId].onicecandidate = null;
+    peerConnectionsRef.current[userId].onnegotiationneeded = null;
+    peerConnectionsRef.current[userId].onremovetrack = null;
+    peerConnectionsRef.current[userId].oniceconnectionstatechange = null;
 
-      peerConnectionsRef.current[id].ontrack = null;
-      peerConnectionsRef.current[id].onicecandidate = null;
-      peerConnectionsRef.current[id].onnegotiationneeded = null;
-      peerConnectionsRef.current[id].onremovetrack = null;
-      peerConnectionsRef.current[id].oniceconnectionstatechange = null;
+    peerConnectionsRef.current[userId].close();
+    peerConnectionsRef.current[userId] = null;
 
-      peerConnectionsRef.current[id].close();
-      peerConnectionsRef.current[id] = null;
-    });
+    setPeerConnections((prevState) => [
+      ...prevState.filter((peer) => peer.userId !== userId),
+    ]);
   }
 
   function handleGetUserMediaError(e) {
@@ -244,8 +245,6 @@ function Meeting() {
         'Error opening your camera and/or microphone: ' + e.message
       );
     }
-
-    handleCloseConnection(peerConnections);
   }
 
   function handleRoomLeave() {
@@ -264,8 +263,8 @@ function Meeting() {
           autoPlay
           playsInline
         />
-        {peerConnections.map((peer, index) => (
-          <Video key={index} peer={peer} />
+        {peerConnections.map(({ userId, peer }) => (
+          <Video key={userId} peer={peer} />
         ))}
       </div>
 
