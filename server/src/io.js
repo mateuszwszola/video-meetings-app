@@ -18,6 +18,15 @@ exports.initialize = function (server) {
 
     users.set(socket.id, []);
 
+    // socket.on('disconnecting', () => {
+    //   const rooms = Object.keys(socket.rooms);
+    //   rooms.forEach((room) => {
+    //     if (room !== socket.id) {
+    //       socket.to(room).emit('USER_DISCONNECTED', socket.id);
+    //     }
+    //   });
+    // });
+
     socket.on('disconnect', () => {
       debug(`A user disconnected with ${socket.id}`);
 

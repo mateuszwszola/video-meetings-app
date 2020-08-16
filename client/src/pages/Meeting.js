@@ -13,6 +13,7 @@ function Meeting() {
   const localVideoRef = useRef(null);
   const peerConnectionsRef = useRef({});
   const [peerConnections, setPeerConnections] = useState([]);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     const socket = initiateSocket();
@@ -31,6 +32,7 @@ function Meeting() {
 
         socket.on('OWNER', () => {
           console.log('OWNER event triggered');
+          setIsOwner(true);
         });
 
         socket.on('USER_JOINED', (userId) => {
@@ -86,8 +88,6 @@ function Meeting() {
 
     peer.onicecandidate = (e) => handleICECandidateEvent(e, userId);
     peer.onnegotiationneeded = (e) => handleNegotiationNeededEvent(e, userId);
-
-    peer.onremovetrack = (e) => handleRemoveTrackEvent(e, userId);
     peer.oniceconnectionstatechange = (e) =>
       handleICEConnectionStateChangeEvent(e, userId);
 
@@ -124,15 +124,6 @@ function Meeting() {
         candidate: e.candidate,
       });
     }
-  }
-
-  function handleRemoveTrackEvent(e, userId) {
-    // const mediaTracks =
-    //   peerConnectionsRef.current[userId] &&
-    //   peerConnectionsRef.current[userId].getTracks();
-    // if (mediaTracks && mediaTracks.length === 0) {
-    //   handleCloseConnection(userId);
-    // }
   }
 
   function handleICEConnectionStateChangeEvent(e, userId) {
@@ -264,16 +255,30 @@ function Meeting() {
           playsInline
         />
         {peerConnections.map(({ userId, peer }) => (
-          <Video key={userId} peer={peer} />
+          <Video
+            key={userId}
+            peer={peer}
+            closeConnection={() => handleCloseConnection(userId)}
+          />
         ))}
       </div>
 
-      <button
-        className="m-2 rounded bg-red-500 text-white py-2 px-4"
-        onClick={handleRoomLeave}
-      >
-        Leave Room
-      </button>
+      <div className="flex justify-center space-x-4 mt-2">
+        <button
+          className="rounded bg-red-500 text-white py-2 px-4"
+          onClick={handleRoomLeave}
+        >
+          Leave Room
+        </button>
+        {isOwner && (
+          <button
+            className="rounded bg-red-500 text-white py-2 px-4"
+            onClick={() => {}}
+          >
+            Hang Up
+          </button>
+        )}
+      </div>
     </div>
   );
 }
