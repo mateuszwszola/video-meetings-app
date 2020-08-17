@@ -1,5 +1,5 @@
 const socketIo = require('socket.io');
-const debug = require('debug')('debug');
+const debug = require('debug')('io');
 
 let io = null;
 
@@ -18,20 +18,14 @@ exports.initialize = function (server) {
 
     users.set(socket.id, []);
 
-    // socket.on('disconnecting', () => {
-    //   const rooms = Object.keys(socket.rooms);
-    //   rooms.forEach((room) => {
-    //     if (room !== socket.id) {
-    //       socket.to(room).emit('USER_DISCONNECTED', socket.id);
-    //     }
-    //   });
-    // });
-
     socket.on('disconnect', () => {
       debug(`A user disconnected with ${socket.id}`);
 
       users.get(socket.id).forEach((room) => {
-        socket.to(room).emit('USER_DISCONNECTED', socket.id);
+        if (room !== socket.id) {
+          socket.to(room).emit('USER_DISCONNECTED', socket.id);
+        }
+
         if (rooms.has(room)) {
           rooms.set(
             room,
@@ -41,8 +35,6 @@ exports.initialize = function (server) {
       });
 
       users.delete(socket.id);
-
-      console.log({ users, rooms });
     });
 
     socket.on('JOIN_ROOM', ({ room }) => {
@@ -56,19 +48,20 @@ exports.initialize = function (server) {
         rooms.set(room, [...rooms.get(room), socket.id]);
       } else {
         rooms.set(room, [socket.id]);
+      }
+
+      const roomUsers = rooms.get(room);
+
+      if (roomUsers.length === 1) {
         socket.emit('OWNER');
       }
 
-      const recipients = rooms
-        .get(room)
-        .filter((userId) => userId !== socket.id);
+      const recipients = roomUsers.filter((userId) => userId !== socket.id);
 
       if (recipients.length > 0) {
         socket.emit('RECIPIENT', recipients);
         socket.to(room).emit('USER_JOINED', socket.id);
       }
-
-      console.log({ users, rooms, recipients });
     });
 
     socket.on('OFFER', (payload) => {

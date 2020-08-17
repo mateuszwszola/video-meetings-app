@@ -6,6 +6,7 @@ import HowItWorks from 'pages/HowItWorks';
 import About from 'pages/About';
 import Meeting from 'pages/Meeting';
 import NotFound from 'pages/NotFound';
+import Login from 'pages/Login';
 
 function App() {
   return (
@@ -20,6 +21,9 @@ function App() {
           </Route>
           <Route path="/about">
             <About />
+          </Route>
+          <Route path="/login">
+            <Login />
           </Route>
           <Route path="/:roomName">
             <Meeting />
