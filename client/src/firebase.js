@@ -2,9 +2,7 @@ import * as firebase from 'firebase/app';
 
 import 'firebase/auth';
 
-import config from './firebaseConfig';
-
-const firebaseConfig = { ...config };
+import { firebaseConfig } from './config';
 
 firebase.initializeApp(firebaseConfig);
 

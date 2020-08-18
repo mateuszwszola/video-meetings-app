@@ -13,14 +13,3 @@ export const disconnectSocket = () => {
     socket.disconnect();
   }
 };
-
-export const subscribeToRoom = ({ userJoinedCb, userLeftCb }) => {
-  if (!socket) return;
-  socket.on('USER_JOINED', (msg) => {
-    return userJoinedCb(null, msg);
-  });
-
-  socket.on('USER_LEFT', (msg) => {
-    return userLeftCb(null, msg);
-  });
-};

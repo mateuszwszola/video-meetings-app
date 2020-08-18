@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 
-function Video({ peer, closeConnection }) {
+function RemoteVideo({ peer, closeConnection }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    console.log('Video effect runs');
     peer.ontrack = handleTrackEvent;
     peer.onremovetrack = handleRemoveTrackEvent;
 
@@ -33,4 +32,4 @@ function Video({ peer, closeConnection }) {
   );
 }
 
-export default Video;
+export default RemoteVideo;

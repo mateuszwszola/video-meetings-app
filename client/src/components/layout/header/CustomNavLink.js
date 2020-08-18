@@ -5,7 +5,7 @@ const CustomNavLink = ({ children, to, ...props }) => (
   <Link
     {...props}
     to={to}
-    className="no-underline text-black font-medium block w-full sm:w-auto text-center p-2"
+    className="cursor-pointer no-underline text-black font-medium block w-full sm:w-auto text-center p-2"
   >
     {children}
   </Link>

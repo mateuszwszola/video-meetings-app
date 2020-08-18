@@ -7,6 +7,8 @@ import About from 'pages/About';
 import Meeting from 'pages/Meeting';
 import NotFound from 'pages/NotFound';
 import Login from 'pages/Login';
+import Dashboard from 'pages/Dashboard';
+import ProtectedRoute from 'components/ProtectedRoute';
 
 function App() {
   return (
@@ -25,6 +27,9 @@ function App() {
           <Route path="/login">
             <Login />
           </Route>
+          <ProtectedRoute path="/dashboard">
+            <Dashboard />
+          </ProtectedRoute>
           <Route path="/:roomName">
             <Meeting />
           </Route>

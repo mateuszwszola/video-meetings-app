@@ -3,7 +3,7 @@ import { useParams, useHistory } from 'react-router-dom';
 import { initiateSocket, disconnectSocket } from 'utils/socket';
 import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
-import Video from 'pages/meeting/Video';
+import RemoteVideo from 'pages/meeting/RemoteVideo';
 
 function Meeting() {
   const { roomName } = useParams();
@@ -264,7 +264,7 @@ function Meeting() {
   }
 
   return (
-    <div className="sm:mt-40">
+    <div className="">
       <h2 className="m-2">{roomName}</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-auto">
@@ -276,7 +276,7 @@ function Meeting() {
           playsInline
         />
         {peerConnections.map(({ userId, peer }) => (
-          <Video
+          <RemoteVideo
             key={userId}
             peer={peer}
             closeConnection={() => handleCloseConnection(userId)}

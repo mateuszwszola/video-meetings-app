@@ -1,26 +1,31 @@
 import React from 'react';
 import { useAuth } from 'context/authContext';
+import { Redirect } from 'react-router-dom';
+import githubIcon from 'icons/github.svg';
 
 function Login(props) {
-  const { user, login, logout } = useAuth();
+  const { login, user } = useAuth();
+  const [redirect, setRedirect] = React.useState(false);
 
-  console.log({ user });
+  React.useEffect(() => {
+    if (user) {
+      setRedirect(true);
+    }
+  }, [user]);
+
+  if (redirect) {
+    return <Redirect to="/dashboard" />;
+  }
 
   return (
-    <div className="sm:mt-40">
-      {user ? (
-        <>
-          <div>
-            {user.photoURL && (
-              <img className="rounded-full w-32" src={user.photoURL} alt={``} />
-            )}
-          </div>
-          {user.displayName && <h3>{user.displayName}</h3>}
-          <button onClick={logout}>Logout</button>
-        </>
-      ) : (
-        <button onClick={login}>Login With Github</button>
-      )}
+    <div className="">
+      <button
+        onClick={login}
+        className="mt-16 mx-auto w-56 px-4 py-2 border border-gray-400 rounded flex items-center justify-between outline-none focus:shadow-outline"
+      >
+        <img className="w-6 h-6" src={githubIcon} alt="github login icon" />
+        <span className="text-gray-700">Log in with Github</span>
+      </button>
     </div>
   );
 }

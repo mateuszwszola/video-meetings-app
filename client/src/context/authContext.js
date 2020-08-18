@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react';
 import useFirebaseAuth from 'hooks/useFirebaseAuth';
+import Loading from 'components/Loading';
 
 const AuthContext = createContext();
 
@@ -7,7 +8,7 @@ function AuthProvider(props) {
   const { user, login, logout, status } = useFirebaseAuth();
 
   if (status === 'loading') {
-    return <div>Loading...</div>;
+    return <Loading />;
   }
 
   const value = {
