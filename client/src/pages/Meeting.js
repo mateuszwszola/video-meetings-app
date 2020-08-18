@@ -55,9 +55,23 @@ function Meeting() {
       .catch(handleGetUserMediaError);
 
     return () => {
+      const events = [
+        'RECIPIENT',
+        'OWNER',
+        'USER_JOINED',
+        'USER_DISCONNECTED',
+        'OFFER',
+        'ANSWER',
+        'NEW_ICE_CANDIDATE',
+      ];
+      events.forEach((event) => socket.off(event));
+      socketRef.current = null;
+
       handleCloseVideoCall();
+
       disconnectSocket();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName]);
 
   function callUsers(remoteUsersIds) {
@@ -128,7 +142,6 @@ function Meeting() {
 
   function handleICEConnectionStateChangeEvent(e, userId) {
     const currentState = peerConnectionsRef.current[userId].iceConnectionState;
-
     if (
       currentState === 'closed' ||
       currentState === 'failed' ||
@@ -216,9 +229,17 @@ function Meeting() {
     peerConnectionsRef.current[userId].close();
     peerConnectionsRef.current[userId] = null;
 
-    setPeerConnections((prevState) => [
-      ...prevState.filter((peer) => peer.userId !== userId),
-    ]);
+    /*
+      When component unmounts, ICEConnectionStateChangeEvent will detect "disconnected" state,
+      which will invoke this function - handleCloseConnection. In that case do not update the state.
+      But when remote peer will close the connection Video component will also call this function, and in that case we want to update the state to remove the video object
+      from the DOM. That's why we first check if socketRef.current exists, if components unmounts, it will set it to null so it won't update the state.
+    */
+    if (socketRef.current) {
+      setPeerConnections((prevState) => [
+        ...prevState.filter((peer) => peer.userId !== userId),
+      ]);
+    }
   }
 
   function handleGetUserMediaError(e) {
