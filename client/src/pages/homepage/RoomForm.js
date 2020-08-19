@@ -15,7 +15,7 @@ const RoomForm = () => {
   };
 
   return (
-    <div className="mt-16 max-w-xs lg:max-w-sm w-full mx-auto">
+    <div className="mt-6 max-w-xs lg:max-w-sm w-full mx-auto">
       <form onSubmit={handleSubmit} className="w-full flex flex-col">
         <label className="sr-only" htmlFor="roomName">
           {createRoom ? 'Create a room' : 'Join a room'}
@@ -24,32 +24,43 @@ const RoomForm = () => {
           <input
             value={roomName}
             onChange={(e) => setRoomName(e.target.value)}
-            className="w-full rounded py-2 px-4 bg-gray-100 border border-gray-300 outline-none focus:shadow-outline"
+            className="w-full rounded py-2 px-4 bg-gray-100 border border-gray-300 focus:outline-none focus:shadow-outline"
             type="text"
             id="roomName"
             name="roomName"
             placeholder="Enter the room name"
           />
-          <button
-            type="submit"
-            className="py-2 px-6 mt-4 bg-blue-500 hover:bg-blue-600 text-blue-100 font-medium tracking-wide uppercase text-sm rounded block mx-auto"
-          >
-            {createRoom ? 'Create a room' : 'Join a room'}
-          </button>
+          <div className="mx-auto mt-2">
+            <button
+              type="submit"
+              className="py-2 sm:py-3 px-4 sm:px-6 mt-4 bg-blue-500 hover:bg-blue-400 active:bg-blue-600 focus:outline-none focus:shadow-outline text-white font-bold tracking-wider uppercase text-sm rounded-lg"
+            >
+              {createRoom ? 'Create a room' : 'Join a room'}
+            </button>
+          </div>
         </div>
 
         <div className="text-center mt-4">
           {createRoom ? (
             <>
               <p>Already know the room name?</p>
-              <button onClick={toggleEnterRoom} className="text-blue-500">
+              <button
+                onClick={toggleEnterRoom}
+                className="text-blue-500 font-medium focus:outline-none focus:underline"
+              >
                 Join the room instead
               </button>
             </>
           ) : (
-            <button onClick={toggleEnterRoom} className="text-blue-500">
-              Create the room
-            </button>
+            <>
+              <p>Want to create new room?</p>
+              <button
+                onClick={toggleEnterRoom}
+                className="text-blue-500 font-medium focus:outline-none focus:underline"
+              >
+                Create the room
+              </button>
+            </>
           )}
         </div>
       </form>

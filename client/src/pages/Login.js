@@ -21,10 +21,12 @@ function Login(props) {
     <div className="">
       <button
         onClick={login}
-        className="mt-16 mx-auto w-56 px-4 py-2 border border-gray-400 rounded flex items-center justify-between outline-none focus:shadow-outline"
+        className="mx-auto w-56 px-4 py-2 border border-gray-400 rounded flex items-center justify-between"
       >
         <img className="w-6 h-6" src={githubIcon} alt="github login icon" />
-        <span className="text-gray-700">Log in with Github</span>
+        <span className="text-gray-700 uppercase text-sm font-medium">
+          Log in with Github
+        </span>
       </button>
     </div>
   );

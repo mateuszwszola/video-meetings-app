@@ -25,3 +25,4 @@ yarn-error.log*
 src/tailwind.output.css
 src/config.js
 .idea
+tailwindcss-config-full.js
