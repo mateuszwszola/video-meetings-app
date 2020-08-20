@@ -44,6 +44,10 @@ function Meeting() {
           handleCloseConnection(userId);
         });
 
+        socket.on('HANG_UP', () => {
+          leaveRoom();
+        });
+
         socket.on('OFFER', handleOfferReceive);
 
         socket.on('ANSWER', handleAnswerReceive);
@@ -259,42 +263,58 @@ function Meeting() {
     }
   }
 
-  function handleRoomLeave() {
+  function leaveRoom() {
     history.push('/');
   }
 
-  return (
-    <div className="">
-      <h2 className="m-2">{roomName}</h2>
+  function handleHangUp() {
+    if (!socketRef.current || !isOwner) return;
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mx-auto">
-        <video
-          className="w-full max-w-full"
-          ref={localVideoRef}
-          muted
-          autoPlay
-          playsInline
-        />
-        {peerConnections.map(({ userId, peer }) => (
-          <RemoteVideo
-            key={userId}
-            peer={peer}
-            closeConnection={() => handleCloseConnection(userId)}
+    socketRef.current.emit('HANG_UP', { room: roomName });
+
+    leaveRoom();
+  }
+
+  return (
+    <div className="flex-1 w-full h-full">
+      <h2 className="text-2xl text-center">
+        Room name:{' '}
+        <span className="text-blue-600 uppercase text-xl font-semibold">
+          {roomName}
+        </span>
+      </h2>
+
+      <div className="mt-2 flex flex-wrap py-8">
+        <div className="w-full sm:w-1/2 mx-auto p-2">
+          <video
+            className="w-full max-w-full"
+            ref={localVideoRef}
+            muted
+            autoPlay
+            playsInline
           />
+        </div>
+        {peerConnections.map(({ userId, peer }) => (
+          <div key={userId} className="w-full sm:w-1/2 mx-auto p-2">
+            <RemoteVideo
+              peer={peer}
+              closeConnection={() => handleCloseConnection(userId)}
+            />
+          </div>
         ))}
       </div>
 
       <div className="flex justify-center space-x-4 mt-2">
         <button
-          className="rounded bg-red-500 text-white py-2 px-4"
-          onClick={handleRoomLeave}
+          className="py-2 px-4 bg-red-500 hover:bg-red-400 active:bg-red-600 text-white font-semibold tracking-wide uppercase text-sm rounded focus:outline-none focus:shadow-outline"
+          onClick={leaveRoom}
         >
           Leave Room
         </button>
         {isOwner && (
           <button
-            className="rounded bg-red-500 text-white py-2 px-4"
-            onClick={() => {}}
+            className="py-2 px-4 bg-red-500 hover:bg-red-400 active:bg-red-600 text-white font-semibold tracking-wide uppercase text-sm rounded focus:outline-none focus:shadow-outline"
+            onClick={handleHangUp}
           >
             Hang Up
           </button>

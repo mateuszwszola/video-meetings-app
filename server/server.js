@@ -5,6 +5,9 @@ const http = require('http');
 const { app } = require('./src/app');
 const server = http.createServer(app);
 const { initialize } = require('./src/io');
+const connectDB = require('./src/config/db');
+
+connectDB();
 
 initialize(server);
 

@@ -7,42 +7,41 @@ exports.io = function () {
   return io;
 };
 
+const rooms = new Map();
+
 exports.initialize = function (server) {
   io = socketIo(server);
-
-  const rooms = new Map();
-  const users = new Map();
 
   io.on('connection', (socket) => {
     debug(`A user connected with ${socket.id}`);
 
-    users.set(socket.id, []);
-
-    socket.on('disconnect', () => {
+    socket.on('disconnecting', () => {
       debug(`A user disconnected with ${socket.id}`);
 
-      users.get(socket.id).forEach((room) => {
+      const socketRooms = Object.keys(socket.rooms);
+
+      socketRooms.forEach((room) => {
         if (room !== socket.id) {
           socket.to(room).emit('USER_DISCONNECTED', socket.id);
-        }
 
-        if (rooms.has(room)) {
-          rooms.set(
-            room,
-            rooms.get(room).filter((userId) => userId !== socket.id)
-          );
+          if (rooms.has(room)) {
+            rooms.set(
+              room,
+              rooms.get(room).filter((userId) => userId !== socket.id)
+            );
+          }
         }
       });
-
-      users.delete(socket.id);
     });
 
-    socket.on('JOIN_ROOM', ({ room }) => {
+    socket.on('JOIN_ROOM', ({ room, username = '' }) => {
       debug(`JOIN_ROOM ${room} triggered for ${socket.id}`);
 
-      socket.join(room);
+      if (username) {
+        socket.username = username;
+      }
 
-      users.set(socket.id, [...users.get(socket.id), room]);
+      socket.join(room);
 
       if (rooms.has(room)) {
         rooms.set(room, [...rooms.get(room), socket.id]);
@@ -62,6 +61,13 @@ exports.initialize = function (server) {
         socket.emit('RECIPIENT', recipients);
         socket.to(room).emit('USER_JOINED', socket.id);
       }
+    });
+
+    socket.on('HANG_UP', ({ room }) => {
+      const isOwner = rooms.get(room)[0] === socket.id;
+      if (!isOwner) return;
+
+      socket.to(room).emit('HANG_UP');
     });
 
     socket.on('OFFER', (payload) => {

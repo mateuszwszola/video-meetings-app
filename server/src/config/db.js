@@ -6,6 +6,7 @@ module.exports = async (url = DB_URL, opts = {}) => {
     const connection = await mongoose.connect(url, {
       ...opts,
       useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
 
     return connection.connection.db;

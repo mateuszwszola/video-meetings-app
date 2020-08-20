@@ -43,20 +43,20 @@ const RoomForm = () => {
         <div className="text-center mt-4">
           {createRoom ? (
             <>
-              <p>Already know the room name?</p>
+              <p>Already know a room name?</p>
               <button
                 onClick={toggleEnterRoom}
-                className="text-blue-500 font-medium focus:outline-none focus:underline"
+                className="text-blue-500 font-medium hover:text-blue-400 focus:outline-none focus:text-blue-600"
               >
                 Join the room instead
               </button>
             </>
           ) : (
             <>
-              <p>Want to create new room?</p>
+              <p>Want to create a new room?</p>
               <button
                 onClick={toggleEnterRoom}
-                className="text-blue-500 font-medium focus:outline-none focus:underline"
+                className="text-blue-500 font-medium hover:text-blue-400 focus:outline-none focus:text-blue-600"
               >
                 Create the room
               </button>
