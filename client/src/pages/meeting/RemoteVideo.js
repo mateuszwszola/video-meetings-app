@@ -23,7 +23,12 @@ function RemoteVideo({ peer, closeConnection }) {
   }, [peer, closeConnection]);
 
   return (
-    <video ref={videoRef} autoPlay playsInline className="w-full max-w-full" />
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      className="w-full max-w-full shadow-2xl"
+    />
   );
 }
 

@@ -287,7 +287,7 @@ function Meeting() {
       <div className="mt-2 flex flex-wrap py-8">
         <div className="w-full sm:w-1/2 mx-auto p-2">
           <video
-            className="w-full max-w-full"
+            className="w-full max-w-full shadow-2xl"
             ref={localVideoRef}
             muted
             autoPlay

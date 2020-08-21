@@ -1,10 +1,10 @@
 import io from 'socket.io-client';
-import { API_URL } from 'config';
+import { SERVER_URL } from 'config';
 
 let socket;
 
 export const initiateSocket = () => {
-  socket = io(API_URL);
+  socket = io(SERVER_URL);
   return socket;
 };
 
