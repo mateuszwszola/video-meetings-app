@@ -29,7 +29,9 @@ exports.createRoom = async (req, res) => {
     throw new ErrorHandler(400, `Room ${roomName} already in use`);
   }
 
-  const { room: createdRoom } = await RoomServiceInstance.createRoom(roomName);
+  const { room: createdRoom } = await RoomServiceInstance.createRoom(
+    urlify(roomName)
+  );
 
   res.json({ message: `Room ${createdRoom.name} created`, room: createdRoom });
 };

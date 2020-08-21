@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import * as roomClient from 'utils/room-client';
 import Loading from 'components/Loading';
+import urlify from 'utils/urlify';
 
 const RoomForm = () => {
   const history = useHistory();
@@ -17,13 +18,18 @@ const RoomForm = () => {
 
   const handleRoomNameInputChange = (e) => {
     const { value } = e.target;
+    if (value && error && error.roomName) {
+      setError(null);
+    }
     setRoomName(value);
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!roomName) return;
+    if (!roomName) {
+      return setError({ roomName: 'Room name is required' });
+    }
 
     setLoading(true);
     setError(null);
@@ -52,7 +58,7 @@ const RoomForm = () => {
           loading ? 'opacity-50' : 'opacity-100'
         }`}
       >
-        {error && (
+        {error?.message && (
           <div className="text-center py-2 text-sm font-semibold uppercase text-red-500 tracking-wide">
             {error.message}
           </div>
@@ -62,16 +68,36 @@ const RoomForm = () => {
             {createRoom ? 'Create a room' : 'Join a room'}
           </label>
           <div className="flex flex-col w-full items-center px-2 max-w-screen-sm">
+            <div className="w-full h-6 mb-1">
+              {createRoom && roomName && (
+                <div className="h-full">
+                  <span className="font-semibold text-xs uppercase text-gray-500">
+                    Room name
+                  </span>
+                  :{' '}
+                  <span className="text-sm text-blue-500">
+                    {urlify(roomName)}
+                  </span>
+                </div>
+              )}
+            </div>
             <input
               disabled={loading}
               value={roomName}
               onChange={handleRoomNameInputChange}
-              className="w-full rounded py-2 px-4 bg-gray-100 border border-gray-300 focus:outline-none focus:shadow-outline"
+              className={`w-full rounded py-2 px-4 bg-gray-100 border focus:outline-none focus:shadow-outline ${
+                error ? 'border-red-500' : 'border-gray-300'
+              }`}
               type="text"
               id="roomName"
               name="roomName"
               placeholder="Enter the room name"
             />
+            {error?.roomName && (
+              <div className="w-full text-sm text-red-500">
+                {error.roomName}
+              </div>
+            )}
             <div className="mx-auto mt-2">
               <button
                 disabled={loading}

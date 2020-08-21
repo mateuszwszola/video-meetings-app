@@ -59,22 +59,52 @@ exports.initialize = function (server) {
       });
     });
 
-    socket.on('JOIN_ROOM', ({ room, username = '' }) => {
-      debug(`JOIN_ROOM ${room} triggered for ${socket.id}`);
+    socket.on('JOIN_ROOM_REQUEST', ({ roomName }) => {
+      const roomUsers = rooms.get(roomName);
+
+      if (roomUsers && roomUsers.length > 0) {
+        // Treat the first user of the room as its owner
+        io.to(roomUsers[0]).emit('JOIN_ROOM_REQUEST', {
+          id: socket.id,
+          username: socket.username,
+        });
+      } else {
+        // Just join the room, you are the boss
+        socket.emit('JOIN_ROOM_ACCEPT');
+      }
+
+      /*
+        ROOM OWNER WILL SEND ONE OF THESE
+          socket.emit('JOIN_ROOM_ACCEPT');
+          socket.emit('JOIN_ROOM_REFUSE');
+      */
+    });
+
+    socket.on('JOIN_ROOM_ACCEPT', ({ id }) => {
+      // inform the user that the owner accepted the call
+      io.to(id).emit('JOIN_ROOM_ACCEPT');
+    });
+
+    socket.on('JOIN_ROOM_REFUSE', ({ id }) => {
+      io.to(id).emit('JOIN_ROOM_REFUSE');
+    });
+
+    socket.on('JOIN_ROOM', ({ roomName, username = '' }) => {
+      debug(`JOIN_ROOM ${roomName} triggered for ${socket.id}`);
 
       if (username) {
         socket.username = username;
       }
 
-      socket.join(room);
+      socket.join(roomName);
 
-      if (rooms.has(room)) {
-        rooms.set(room, [...rooms.get(room), socket.id]);
+      if (rooms.has(roomName)) {
+        rooms.set(roomName, [...rooms.get(roomName), socket.id]);
       } else {
-        rooms.set(room, [socket.id]);
+        rooms.set(roomName, [socket.id]);
       }
 
-      const roomUsers = rooms.get(room);
+      const roomUsers = rooms.get(roomName);
 
       if (roomUsers.length === 1) {
         socket.emit('OWNER');
@@ -84,15 +114,15 @@ exports.initialize = function (server) {
 
       if (recipients.length > 0) {
         socket.emit('RECIPIENT', recipients);
-        socket.to(room).emit('USER_JOINED', socket.id);
+        socket.to(roomName).emit('USER_JOINED', socket.id);
       }
     });
 
-    socket.on('HANG_UP', ({ room }) => {
-      const isOwner = rooms.get(room)[0] === socket.id;
-      if (!isOwner) return;
-
-      socket.to(room).emit('HANG_UP');
+    socket.on('HANG_UP', ({ roomName }) => {
+      const isOwner = rooms.get(roomName)[0] === socket.id;
+      if (isOwner) {
+        socket.to(roomName).emit('HANG_UP');
+      }
     });
 
     socket.on('OFFER', (payload) => {

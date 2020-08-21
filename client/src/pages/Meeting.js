@@ -23,7 +23,22 @@ function Meeting() {
         localMediaStreamRef.current = mediaStream;
         localVideoRef.current.srcObject = mediaStream;
 
-        socket.emit('JOIN_ROOM', { room: roomName });
+        socket.emit('JOIN_ROOM_REQUEST', { roomName });
+
+        socket.on('JOIN_ROOM_ACCEPT', () => {
+          socket.emit('JOIN_ROOM', { roomName });
+        });
+
+        socket.on('JOIN_ROOM_REFUSE', () => {
+          leaveRoom();
+        });
+
+        socket.on('JOIN_ROOM_REQUEST', ({ id, username = '' }) => {
+          console.log(`User ${username} with id ${id} is calling`);
+          setTimeout(() => {
+            socket.emit('JOIN_ROOM_ACCEPT', { id });
+          }, 2000);
+        });
 
         socket.on('RECIPIENT', (recipientsIds) => {
           console.log('RECIPIENT triggered', recipientsIds);
@@ -60,6 +75,9 @@ function Meeting() {
 
     return () => {
       const events = [
+        'JOIN_ROOM_ACCEPT',
+        'JOIN_ROOM_REFUSE',
+        'JOIN_ROOM_REQUEST',
         'RECIPIENT',
         'OWNER',
         'USER_JOINED',
@@ -270,7 +288,7 @@ function Meeting() {
   function handleHangUp() {
     if (!socketRef.current || !isOwner) return;
 
-    socketRef.current.emit('HANG_UP', { room: roomName });
+    socketRef.current.emit('HANG_UP', { roomName });
 
     leaveRoom();
   }
@@ -279,9 +297,7 @@ function Meeting() {
     <div className="flex-1 w-full h-full">
       <h2 className="text-2xl text-center">
         Room name:{' '}
-        <span className="text-blue-600 uppercase text-xl font-semibold">
-          {roomName}
-        </span>
+        <span className="text-blue-600 font-semibold">{roomName}</span>
       </h2>
 
       <div className="mt-2 flex flex-wrap py-8">
