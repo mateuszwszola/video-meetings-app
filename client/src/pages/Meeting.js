@@ -4,6 +4,8 @@ import { initiateSocket, disconnectSocket } from 'utils/socket';
 import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
 import RemoteVideo from 'pages/meeting/RemoteVideo';
+import RingingOverlay from 'pages/meeting/RingingOverlay';
+import Loading from 'components/Loading';
 
 function Meeting() {
   const { roomName } = useParams();
@@ -14,6 +16,8 @@ function Meeting() {
   const peerConnectionsRef = useRef({});
   const [peerConnections, setPeerConnections] = useState([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [ringingUser, setRingingUser] = useState(null);
+  const [ringing, setRinging] = useState(true);
 
   useEffect(() => {
     const socket = initiateSocket();
@@ -25,19 +29,20 @@ function Meeting() {
 
         socket.emit('JOIN_ROOM_REQUEST', { roomName });
 
+        socket.on('JOIN_ROOM_REQUEST', (user) => {
+          console.log('JOIN_ROOM_REQUEST triggered', user);
+          setRingingUser(user);
+        });
+
         socket.on('JOIN_ROOM_ACCEPT', () => {
+          setRinging(false);
+          console.log('JOIN_ROOM_ACCEPT triggered');
           socket.emit('JOIN_ROOM', { roomName });
         });
 
-        socket.on('JOIN_ROOM_REFUSE', () => {
+        socket.on('JOIN_ROOM_DECLINE', () => {
+          console.log('JOIN_ROOM_DECLINE triggered');
           leaveRoom();
-        });
-
-        socket.on('JOIN_ROOM_REQUEST', ({ id, username = '' }) => {
-          console.log(`User ${username} with id ${id} is calling`);
-          setTimeout(() => {
-            socket.emit('JOIN_ROOM_ACCEPT', { id });
-          }, 2000);
         });
 
         socket.on('RECIPIENT', (recipientsIds) => {
@@ -76,7 +81,7 @@ function Meeting() {
     return () => {
       const events = [
         'JOIN_ROOM_ACCEPT',
-        'JOIN_ROOM_REFUSE',
+        'JOIN_ROOM_DECLINE',
         'JOIN_ROOM_REQUEST',
         'RECIPIENT',
         'OWNER',
@@ -293,50 +298,68 @@ function Meeting() {
     leaveRoom();
   }
 
-  return (
-    <div className="flex-1 w-full h-full">
-      <h2 className="text-2xl text-center">
-        Room name:{' '}
-        <span className="text-blue-600 font-semibold">{roomName}</span>
-      </h2>
+  function handleJoinRoomAcceptClick({ id }) {
+    socketRef.current.emit('JOIN_ROOM_ACCEPT', { id });
+    setRingingUser(null);
+  }
 
-      <div className="mt-2 flex flex-wrap py-8">
-        <div className="w-full sm:w-1/2 mx-auto p-2">
-          <video
-            className="w-full max-w-full shadow-2xl"
-            ref={localVideoRef}
-            muted
-            autoPlay
-            playsInline
-          />
-        </div>
-        {peerConnections.map(({ userId, peer }) => (
-          <div key={userId} className="w-full sm:w-1/2 mx-auto p-2">
-            <RemoteVideo
-              peer={peer}
-              closeConnection={() => handleCloseConnection(userId)}
+  function handleJoinRoomDeclineClick({ id }) {
+    socketRef.current.emit('JOIN_ROOM_DECLINE', { id });
+    setRingingUser(null);
+  }
+
+  return (
+    <>
+      {!isOwner && ringing && <Loading />}
+      <RingingOverlay
+        ringingUser={ringingUser}
+        handleJoinRoomAcceptClick={handleJoinRoomAcceptClick}
+        handleJoinRoomDeclineClick={handleJoinRoomDeclineClick}
+      />
+      <div className="flex-1 w-full h-full">
+        <h2 className="text-2xl text-center">
+          Room name:{' '}
+          <span className="text-blue-600 font-semibold">{roomName}</span>
+        </h2>
+
+        <div className="mt-2 flex flex-wrap py-8">
+          <div className="w-full sm:w-1/2 mx-auto p-2">
+            <video
+              className="w-full max-w-full shadow-2xl"
+              ref={localVideoRef}
+              muted
+              autoPlay
+              playsInline
             />
           </div>
-        ))}
-      </div>
+          {peerConnections.map(({ userId, peer }) => (
+            <div key={userId} className="w-full sm:w-1/2 mx-auto p-2">
+              <RemoteVideo
+                peer={peer}
+                closeConnection={() => handleCloseConnection(userId)}
+              />
+            </div>
+          ))}
+        </div>
 
-      <div className="flex justify-center space-x-4 mt-2">
-        <button
-          className="py-2 px-4 bg-red-500 hover:bg-red-400 active:bg-red-600 text-white font-semibold tracking-wide uppercase text-sm rounded focus:outline-none focus:shadow-outline"
-          onClick={leaveRoom}
-        >
-          Leave Room
-        </button>
-        {isOwner && (
+        <div className="flex justify-center space-x-4 mt-2">
           <button
             className="py-2 px-4 bg-red-500 hover:bg-red-400 active:bg-red-600 text-white font-semibold tracking-wide uppercase text-sm rounded focus:outline-none focus:shadow-outline"
-            onClick={handleHangUp}
+            onClick={leaveRoom}
           >
-            Hang Up
+            Leave Room
           </button>
-        )}
+          {isOwner && (
+            <button
+              className="py-2 px-4 bg-red-500 hover:bg-red-400 active:bg-red-600 text-white font-semibold tracking-wide uppercase text-sm rounded focus:outline-none focus:shadow-outline"
+              onClick={handleHangUp}
+            >
+              Hang Up
+            </button>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

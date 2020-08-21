@@ -76,7 +76,7 @@ exports.initialize = function (server) {
       /*
         ROOM OWNER WILL SEND ONE OF THESE
           socket.emit('JOIN_ROOM_ACCEPT');
-          socket.emit('JOIN_ROOM_REFUSE');
+          socket.emit('JOIN_ROOM_DECLINE');
       */
     });
 
@@ -85,8 +85,8 @@ exports.initialize = function (server) {
       io.to(id).emit('JOIN_ROOM_ACCEPT');
     });
 
-    socket.on('JOIN_ROOM_REFUSE', ({ id }) => {
-      io.to(id).emit('JOIN_ROOM_REFUSE');
+    socket.on('JOIN_ROOM_DECLINE', ({ id }) => {
+      io.to(id).emit('JOIN_ROOM_DECLINE');
     });
 
     socket.on('JOIN_ROOM', ({ roomName, username = '' }) => {
@@ -119,7 +119,8 @@ exports.initialize = function (server) {
     });
 
     socket.on('HANG_UP', ({ roomName }) => {
-      const isOwner = rooms.get(roomName)[0] === socket.id;
+      const roomUsers = rooms.get(roomName);
+      const isOwner = roomUsers && roomUsers[0] === socket.id;
       if (isOwner) {
         socket.to(roomName).emit('HANG_UP');
       }

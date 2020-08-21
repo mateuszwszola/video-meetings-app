@@ -7,7 +7,11 @@ module.exports = {
     './public/**/*.html',
   ],
   theme: {
-    extend: {},
+    extend: {
+      opacity: {
+        '95': '0.95',
+      },
+    },
   },
   variants: {
     backgroundColor: ['responsive', 'hover', 'focus', 'active'],
