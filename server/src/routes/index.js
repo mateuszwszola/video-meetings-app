@@ -1,8 +1,9 @@
-const express = require('express');
-const router = express.Router();
+const router = require('express').Router();
+const roomRouter = require('./room');
+const userRouter = require('./user');
 
-router.get('/', (req, res) => {
-  res.send({ response: 'Hello world!' });
-});
+router.use('/user', userRouter);
+
+router.use('/room', roomRouter);
 
 module.exports = router;

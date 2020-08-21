@@ -6,5 +6,6 @@ module.exports = {
   isTest: env === 'test',
   isProd: env === 'production',
   port: process.env.PORT || 3001,
-  DB_URL: process.env.DB_URL,
+  dbUrl: process.env.DB_URL,
+  corsOrigin: process.env.CORS_ORIGIN,
 };

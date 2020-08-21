@@ -1,5 +1,8 @@
 const socketIo = require('socket.io');
 const debug = require('debug')('io');
+const RoomService = require('./services/room');
+
+const RoomServiceInstance = new RoomService();
 
 let io = null;
 
@@ -29,6 +32,28 @@ exports.initialize = function (server) {
               room,
               rooms.get(room).filter((userId) => userId !== socket.id)
             );
+
+            /*
+              There is no users in that room, delete the record from db
+              to allow other users to create a room with that name.
+              But make sure no one owns that room
+            */
+            if (rooms.get(room).length === 0) {
+              RoomServiceInstance.getRoom(room)
+                .then((res) => {
+                  if (res.room && !res.room.owner) {
+                    return RoomServiceInstance.deleteRoom(room);
+                  }
+                })
+                .then((res) => {
+                  if (res && res.room) {
+                    console.log(`Room deleted: ${res.room.name}`);
+                  }
+                })
+                .catch((err) => {
+                  console.error(err);
+                });
+            }
           }
         }
       });

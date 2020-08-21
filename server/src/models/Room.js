@@ -10,6 +10,6 @@ const roomSchema = new mongoose.Schema({
   },
 });
 
-const Room = mongoose.model('User', roomSchema);
+const Room = mongoose.model('Room', roomSchema);
 
 module.exports = Room;

@@ -1,16 +1,8 @@
 const router = require('express').Router();
-const Room = require('../models/Room');
+const roomController = require('../controllers/room');
 
-router.post('/room/:roomName', async (req, res, next) => {
-  const { roomName } = req.params;
+router.get('/:roomName', roomController.getRoom);
 
-  const doc = await Room.findOne({ name: roomName });
-
-  if (doc) {
-    return res.status(400).json({ message: `Room ${roomName} already in use` });
-  }
-
-  // TODO: create the room for the user
-});
+router.post('/', roomController.createRoom);
 
 module.exports = router;
