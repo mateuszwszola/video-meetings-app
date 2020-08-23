@@ -5,8 +5,7 @@ const roomSchema = new mongoose.Schema({
     type: String,
   },
   owner: {
-    type: mongoose.ObjectId,
-    ref: 'User',
+    type: String,
   },
 });
 

@@ -8,4 +8,10 @@ module.exports = {
   port: process.env.PORT || 3001,
   dbUrl: process.env.DB_URL,
   corsOrigin: process.env.CORS_ORIGIN,
+  jwt: {
+    secret: process.env.JWT_SECRET,
+    audience: process.env.JWT_AUDIENCE,
+    issuer: process.env.JWT_ISSUER,
+    algorithms: ['HS256'],
+  },
 };

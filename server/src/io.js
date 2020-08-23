@@ -21,41 +21,41 @@ exports.initialize = function (server) {
     socket.on('disconnecting', () => {
       debug(`A user disconnected with ${socket.id}`);
 
-      const socketRooms = Object.keys(socket.rooms);
+      Object.keys(socket.rooms).forEach(async (room) => {
+        if (room === socket.id) return;
 
-      socketRooms.forEach((room) => {
-        if (room !== socket.id) {
-          socket.to(room).emit('USER_DISCONNECTED', socket.id);
+        socket.to(room).emit('USER_DISCONNECTED', socket.id);
 
-          if (rooms.has(room)) {
-            rooms.set(
-              room,
-              rooms.get(room).filter((userId) => userId !== socket.id)
-            );
+        if (!rooms.has(room)) return;
 
-            /*
-              There is no users in that room, delete the record from db
-              to allow other users to create a room with that name.
-              But make sure no one owns that room
-            */
-            if (rooms.get(room).length === 0) {
-              RoomServiceInstance.getRoom(room)
-                .then((res) => {
-                  if (res.room && !res.room.owner) {
-                    return RoomServiceInstance.deleteRoom(room);
-                  }
-                })
-                .then((res) => {
-                  if (res && res.room) {
-                    console.log(`Room deleted: ${res.room.name}`);
-                  }
-                })
-                .catch((err) => {
-                  console.error(err);
-                });
+        const roomUsers = rooms.get(room);
+        /*
+          There is no users in that room, delete the record from db
+          to allow other users to create a room with that name.
+          But make sure no one owns that room.
+          In case no one owns the room, choose new owner
+        */
+        try {
+          const { room: dbRoom } = await RoomServiceInstance.getRoom(room);
+
+          if (roomUsers.length === 1) {
+            if (dbRoom && !dbRoom.owner) {
+              await RoomServiceInstance.deleteRoom(room);
+              console.log(`Room deleted: ${dbRoom.name}`);
+            }
+          } else if (!dbRoom || (dbRoom && !dbRoom.owner)) {
+            if (roomUsers[0] === socket.id) {
+              io.to(roomUsers[1]).emit('OWNER');
             }
           }
+        } catch (err) {
+          console.error(err);
         }
+
+        rooms.set(
+          room,
+          rooms.get(room).filter((userId) => userId !== socket.id)
+        );
       });
     });
 
