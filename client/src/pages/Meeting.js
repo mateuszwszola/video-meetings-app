@@ -298,24 +298,31 @@ function Meeting() {
     leaveRoom();
   }
 
-  function handleJoinRoomAcceptClick({ id }) {
-    socketRef.current.emit('JOIN_ROOM_ACCEPT', { id });
+  function handleJoinRoomAcceptClick() {
+    if (!ringingUser) return;
+    socketRef.current.emit('JOIN_ROOM_ACCEPT', { id: ringingUser.id });
     setRingingUser(null);
   }
 
-  function handleJoinRoomDeclineClick({ id }) {
-    socketRef.current.emit('JOIN_ROOM_DECLINE', { id });
+  function handleJoinRoomDeclineClick() {
+    if (!ringingUser) return;
+    socketRef.current.emit('JOIN_ROOM_DECLINE', { id: ringingUser.id });
     setRingingUser(null);
   }
 
   return (
     <>
-      {!isOwner && ringing && <Loading />}
-      <RingingOverlay
-        ringingUser={ringingUser}
-        handleJoinRoomAcceptClick={handleJoinRoomAcceptClick}
-        handleJoinRoomDeclineClick={handleJoinRoomDeclineClick}
-      />
+      {!isOwner && ringing ? (
+        <Loading />
+      ) : ringingUser ? (
+        <RingingOverlay
+          ringingUser={ringingUser}
+          handleAccept={handleJoinRoomAcceptClick}
+          handleDecline={handleJoinRoomDeclineClick}
+        />
+      ) : (
+        ''
+      )}
       <div className="flex-1 w-full h-full">
         <h2 className="text-2xl text-center">
           Room name:{' '}

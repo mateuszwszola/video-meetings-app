@@ -1,15 +1,15 @@
 import React from 'react';
 import CustomNavLink from 'components/layout/header/CustomNavLink';
-import { useUser } from 'context/userContext';
+import { useAuth0 } from '@auth0/auth0-react';
 
 const Header = () => {
-  const user = useUser();
+  const { isAuthenticated } = useAuth0();
 
   return (
     <header className="py-4 px-2 sm:px-6">
       <nav className="w-full max-w-screen-xl mx-auto flex items-center justify-between">
         <CustomNavLink to="/">Home</CustomNavLink>
-        {user ? (
+        {isAuthenticated ? (
           <CustomNavLink to="/dashboard">Dashboard</CustomNavLink>
         ) : (
           <>

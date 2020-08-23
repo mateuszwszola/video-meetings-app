@@ -22,8 +22,8 @@ const Footer = () => {
         <span>Created with</span>
         <span role="img" aria-label="heart-icon">
           ❤️
-        </span>{' '}
-        <span>by</span>
+        </span>
+        <span>by </span>
         <a
           className="text-blue-500 hover:text-blue-400 text-sm uppercase tracking-wide font-semibold focus:outline-none focus:text-blue-300"
           target="_blank"

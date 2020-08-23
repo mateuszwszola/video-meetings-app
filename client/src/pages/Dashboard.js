@@ -1,17 +1,40 @@
 import React from 'react';
-import { useAuth } from 'context/authContext';
-import logoutIcon from 'icons/log-out.svg';
 import { Link } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
+import logoutIcon from 'icons/log-out.svg';
+import { SERVER_URL, auth0Config } from 'config';
 
-function Dashboard(props) {
-  const { logout, user } = useAuth();
+function Dashboard() {
+  const { user, logout, getAccessTokenSilently } = useAuth0();
+
+  React.useEffect(() => {
+    getAccessTokenSilently({
+      audience: auth0Config.audience,
+      scope: '',
+    }).then((accessToken) => {
+      console.log({ accessToken });
+
+      fetch(`${SERVER_URL}/authorized`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+        .then((res) => res.text())
+        .then((data) => {
+          console.log(data);
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    });
+  }, []);
 
   return (
     <div className="">
       <div className="w-full flex justify-end py-4 px-2">
         <button
           className="w-32 px-2 py-1 border border-gray-400 rounded flex items-center justify-between outline-none focus:shadow-outline"
-          onClick={logout}
+          onClick={() => logout({ returnTo: window.location.origin })}
         >
           <img
             className="w-6 h-6 text-gray-400 fill-current"
@@ -22,15 +45,15 @@ function Dashboard(props) {
         </button>
       </div>
       <div className="w-full flex flex-col items-center justify-center py-4">
-        {user.photoURL && (
+        {user.picture && (
           <img
             className="w-32 h-32 rounded-full"
-            src={user.photoURL}
+            src={user.picture}
             alt="user"
           />
         )}
         <h3 className="text-lg font-semibold mt-2">
-          {user.displayName || 'User'}
+          {user.nickname || 'User'}
         </h3>
       </div>
       <div>
