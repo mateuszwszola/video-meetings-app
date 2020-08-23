@@ -2,32 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import logoutIcon from 'icons/log-out.svg';
-import { SERVER_URL, auth0Config } from 'config';
+import useApi from 'hooks/useApi';
 
 function Dashboard() {
-  const { user, logout, getAccessTokenSilently } = useAuth0();
+  const { user, logout } = useAuth0();
+  const { loading, error, data } = useApi('authorized');
 
-  React.useEffect(() => {
-    getAccessTokenSilently({
-      audience: auth0Config.audience,
-      scope: '',
-    }).then((accessToken) => {
-      console.log({ accessToken });
-
-      fetch(`${SERVER_URL}/authorized`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      })
-        .then((res) => res.text())
-        .then((data) => {
-          console.log(data);
-        })
-        .catch((err) => {
-          console.error(err);
-        });
-    });
-  }, []);
+  console.log({ data, error, loading });
 
   return (
     <div className="">
