@@ -29,9 +29,36 @@ exports.createRoom = async (req, res) => {
     throw new ErrorHandler(400, `Room ${roomName} already in use`);
   }
 
-  const { room: createdRoom } = await RoomServiceInstance.createRoom(
-    urlify(roomName)
-  );
+  const { room: createdRoom } = await RoomServiceInstance.createRoom({
+    name: urlify(roomName),
+  });
 
   res.json({ message: `Room ${createdRoom.name} created`, room: createdRoom });
+};
+
+exports.createAndSaveRoom = async (req, res) => {
+  const { roomName } = req.body;
+
+  if (!roomName || roomName.length > 100) {
+    throw new ErrorHandler(422, 'Invalid room name');
+  }
+
+  const { room } = await RoomServiceInstance.getRoom(roomName);
+
+  if (room) {
+    throw new ErrorHandler(400, `Room ${roomName} already in use`);
+  }
+
+  const userId = (req.user.sub && req.user.sub.split('|')[1]) || null;
+
+  if (!userId) {
+    throw new ErrorHandler(401, 'not authorized');
+  }
+
+  const { room: createdRoom } = await RoomServiceInstance.createRoom({
+    name: urlify(roomName),
+    owner: userId,
+  });
+
+  return res.json({ room: createdRoom });
 };

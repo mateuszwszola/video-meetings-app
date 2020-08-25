@@ -38,12 +38,14 @@ exports.initialize = function (server) {
         try {
           const { room: dbRoom } = await RoomServiceInstance.getRoom(room);
 
-          if (roomUsers.length === 1) {
-            if (dbRoom && !dbRoom.owner) {
+          const roomExists = !!dbRoom,
+            roomHasOwner = !!(dbRoom && dbRoom.owner);
+
+          if (roomUsers.length <= 1) {
+            if (roomExists && !roomHasOwner) {
               await RoomServiceInstance.deleteRoom(room);
-              console.log(`Room deleted: ${dbRoom.name}`);
             }
-          } else if (!dbRoom || (dbRoom && !dbRoom.owner)) {
+          } else if (!roomExists || (roomExists && !roomHasOwner)) {
             if (roomUsers[0] === socket.id) {
               io.to(roomUsers[1]).emit('OWNER');
             }
@@ -59,29 +61,20 @@ exports.initialize = function (server) {
       });
     });
 
-    socket.on('JOIN_ROOM_REQUEST', ({ roomName }) => {
+    socket.on('JOIN_ROOM_REQUEST', ({ roomName, username = '' }) => {
       const roomUsers = rooms.get(roomName);
 
       if (roomUsers && roomUsers.length > 0) {
-        // Treat the first user of the room as its owner
         io.to(roomUsers[0]).emit('JOIN_ROOM_REQUEST', {
           id: socket.id,
-          username: socket.username,
+          username,
         });
       } else {
-        // Just join the room, you are the boss
         socket.emit('JOIN_ROOM_ACCEPT');
       }
-
-      /*
-        ROOM OWNER WILL SEND ONE OF THESE
-          socket.emit('JOIN_ROOM_ACCEPT');
-          socket.emit('JOIN_ROOM_DECLINE');
-      */
     });
 
     socket.on('JOIN_ROOM_ACCEPT', ({ id }) => {
-      // inform the user that the owner accepted the call
       io.to(id).emit('JOIN_ROOM_ACCEPT');
     });
 
@@ -89,7 +82,7 @@ exports.initialize = function (server) {
       io.to(id).emit('JOIN_ROOM_DECLINE');
     });
 
-    socket.on('JOIN_ROOM', ({ roomName, username = '' }) => {
+    socket.on('JOIN_ROOM', ({ roomName, username }) => {
       debug(`JOIN_ROOM ${roomName} triggered for ${socket.id}`);
 
       if (username) {

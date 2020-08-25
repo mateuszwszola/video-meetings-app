@@ -7,8 +7,8 @@ class RoomService {
     return { room };
   }
 
-  async createRoom(name) {
-    const room = await Room.create({ name });
+  async createRoom(data) {
+    const room = await Room.create(data);
 
     return { room };
   }

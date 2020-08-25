@@ -2,15 +2,11 @@ const express = require('express');
 require('express-async-errors');
 const cors = require('cors');
 const morgan = require('morgan');
-const jwt = require('express-jwt');
 const apiRoutes = require('./routes');
 const { handleNotFound, handleError } = require('./utils/error');
 const config = require('./config');
 const app = express();
-
-const jwtCheck = jwt({
-  ...config.jwt,
-});
+const jwtCheck = require('./utils/jwt-check');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -21,9 +17,9 @@ app.use('/api', apiRoutes);
 
 app.use(jwtCheck);
 
-app.get('/authorized', (req, res) => {
+app.get('/api/authorized', (req, res) => {
   console.log('user', req.user);
-  res.send('Secured resource');
+  res.json({ message: 'Secured resource' });
 });
 
 app.use(handleNotFound);

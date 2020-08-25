@@ -6,6 +6,9 @@ import useApi from 'hooks/useApi';
 
 function Dashboard() {
   const { user, logout } = useAuth0();
+
+  console.log({ user });
+
   const { loading, error, data } = useApi('authorized');
 
   console.log({ data, error, loading });

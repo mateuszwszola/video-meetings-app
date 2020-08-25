@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
+import { useAuth0 } from '@auth0/auth0-react';
 import { initiateSocket, disconnectSocket } from 'utils/socket';
 import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
@@ -18,6 +19,9 @@ function Meeting() {
   const [isOwner, setIsOwner] = useState(false);
   const [ringingUser, setRingingUser] = useState(null);
   const [ringing, setRinging] = useState(true);
+  const { isAuthenticated, user } = useAuth0();
+
+  const username = isAuthenticated && user?.nickname;
 
   useEffect(() => {
     const socket = initiateSocket();
@@ -27,7 +31,7 @@ function Meeting() {
         localMediaStreamRef.current = mediaStream;
         localVideoRef.current.srcObject = mediaStream;
 
-        socket.emit('JOIN_ROOM_REQUEST', { roomName });
+        socket.emit('JOIN_ROOM_REQUEST', { roomName, username });
 
         socket.on('JOIN_ROOM_REQUEST', (user) => {
           console.log('JOIN_ROOM_REQUEST triggered', user);
@@ -37,7 +41,7 @@ function Meeting() {
         socket.on('JOIN_ROOM_ACCEPT', () => {
           setRinging(false);
           console.log('JOIN_ROOM_ACCEPT triggered');
-          socket.emit('JOIN_ROOM', { roomName });
+          socket.emit('JOIN_ROOM', { roomName, username });
         });
 
         socket.on('JOIN_ROOM_DECLINE', () => {
