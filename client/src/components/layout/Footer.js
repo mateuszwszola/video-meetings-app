@@ -18,14 +18,14 @@ const Footer = () => {
           About
         </Link>
       </div>
-      <div className="text-center flex items-baseline justify-center space-x-1">
+      <div className="flex items-baseline justify-center">
         <span>Created with</span>
-        <span role="img" aria-label="heart-icon">
+        <span role="img" aria-label="heart-icon" className="inline-block mx-1">
           ❤️
         </span>
-        <span>by </span>
+        <span>by</span>
         <a
-          className="text-blue-500 hover:text-blue-400 text-sm uppercase tracking-wide font-semibold focus:outline-none focus:text-blue-300"
+          className="ml-1 text-blue-500 hover:text-blue-400 text-sm uppercase tracking-wide font-semibold focus:outline-none focus:text-blue-300"
           target="_blank"
           rel="noopener noreferrer"
           href="https://github.com/mateuszwszola/video-meetings-app"

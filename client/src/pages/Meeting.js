@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
-import { useAuth0 } from '@auth0/auth0-react';
 import { initiateSocket, disconnectSocket } from 'utils/socket';
 import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
 import RemoteVideo from 'pages/meeting/RemoteVideo';
 import RingingOverlay from 'pages/meeting/RingingOverlay';
 import Loading from 'components/Loading';
+import Layout from 'components/Layout';
 
 function Meeting() {
   const { roomName } = useParams();
@@ -19,9 +19,6 @@ function Meeting() {
   const [isOwner, setIsOwner] = useState(false);
   const [ringingUser, setRingingUser] = useState(null);
   const [ringing, setRinging] = useState(true);
-  const { isAuthenticated, user } = useAuth0();
-
-  const username = isAuthenticated && user?.nickname;
 
   useEffect(() => {
     const socket = initiateSocket();
@@ -31,7 +28,7 @@ function Meeting() {
         localMediaStreamRef.current = mediaStream;
         localVideoRef.current.srcObject = mediaStream;
 
-        socket.emit('JOIN_ROOM_REQUEST', { roomName, username });
+        socket.emit('JOIN_ROOM_REQUEST', { roomName });
 
         socket.on('JOIN_ROOM_REQUEST', (user) => {
           console.log('JOIN_ROOM_REQUEST triggered', user);
@@ -39,9 +36,9 @@ function Meeting() {
         });
 
         socket.on('JOIN_ROOM_ACCEPT', () => {
-          setRinging(false);
           console.log('JOIN_ROOM_ACCEPT triggered');
-          socket.emit('JOIN_ROOM', { roomName, username });
+          setRinging(false);
+          socket.emit('JOIN_ROOM', { roomName });
         });
 
         socket.on('JOIN_ROOM_DECLINE', () => {
@@ -263,8 +260,8 @@ function Meeting() {
     /*
       When component unmounts, ICEConnectionStateChangeEvent will detect "disconnected" state,
       which will invoke this function - handleCloseConnection. In that case do not update the state.
-      But when remote peer will close the connection Video component will also call this function, and in that case we want to update the state to remove the video object
-      from the DOM. That's why we first check if socketRef.current exists, if components unmounts, it will set it to null so it won't update the state.
+      But when remote peer will close the connection, Video component will also call this function, and in that case we want to update the state to remove the video object
+      from the DOM. That's why we first check if socketRef.current exists, if components unmounts, it will set it to null so it won't update the state which will prevent error.
     */
     if (socketRef.current) {
       setPeerConnections((prevState) => [
@@ -315,7 +312,7 @@ function Meeting() {
   }
 
   return (
-    <>
+    <Layout>
       {!isOwner && ringing ? (
         <Loading />
       ) : ringingUser ? (
@@ -336,7 +333,7 @@ function Meeting() {
         <div className="mt-2 flex flex-wrap py-8">
           <div className="w-full sm:w-1/2 mx-auto p-2">
             <video
-              className="w-full max-w-full shadow-2xl"
+              className="w-full max-w-full"
               ref={localVideoRef}
               muted
               autoPlay
@@ -370,7 +367,7 @@ function Meeting() {
           )}
         </div>
       </div>
-    </>
+    </Layout>
   );
 }
 

@@ -4,5 +4,5 @@ const mediaConstraints = {
 };
 
 export function openUserMedia() {
-  return navigator.mediaDevices.getUserMedia(mediaConstraints);
+  return window.navigator.mediaDevices.getUserMedia(mediaConstraints);
 }

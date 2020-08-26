@@ -3,42 +3,57 @@ import { useHistory } from 'react-router-dom';
 import * as roomClient from 'utils/room-client';
 import Loading from 'components/Loading';
 import urlify from 'utils/urlify';
+import useRoom from 'hooks/useRoom';
 
 const RoomForm = () => {
   const history = useHistory();
   const [createRoom, setCreateRoom] = useState(true);
+  const [identity, setIdentity] = useState('');
   const [roomName, setRoomName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const { state, dispatch } = useRoom();
 
   const toggleEnterRoom = () => {
     setCreateRoom((prevState) => !prevState);
     setError(null);
   };
 
-  const handleRoomNameInputChange = (e) => {
-    const { value } = e.target;
-    if (value && error && error.roomName) {
-      setError(null);
+  const handleRoomNameChange = (e) => {
+    setRoomName(e.target.value);
+    if (error && error.roomName) {
+      setError((e) => ({ ...e, roomName: '' }));
     }
-    setRoomName(value);
+  };
+
+  const handleIdentityChange = (e) => {
+    setIdentity(e.target.value);
+    if (error && error.identity) {
+      setError((e) => ({ ...e, identity: '' }));
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    if (!roomName) {
-      return setError({ roomName: 'Room name is required' });
+    if (!roomName || !identity) {
+      return setError((e) => ({
+        ...e,
+        ...(!roomName ? { roomName: 'Room name is required' } : null),
+        ...(!identity ? { identity: 'Display name is required' } : null),
+      }));
     }
 
     setLoading(true);
     setError(null);
 
-    const submit = createRoom ? roomClient.createRoom : roomClient.getRoom;
+    const submit = createRoom ? roomClient.createRoom : roomClient.joinRoom;
 
-    submit(roomName)
+    submit({ roomName, identity })
       .then((res) => {
+        dispatch({ type: 'join_room', identity, roomName });
         history.push('/' + res.room.name);
+        console.log(res);
       })
       .catch((err) => {
         setError(err);
@@ -48,13 +63,14 @@ const RoomForm = () => {
 
   return (
     <>
+      <pre>{JSON.stringify(state, null, 2)}</pre>
       {loading && (
         <div className="absolute inset-0 z-40">
           <Loading />
         </div>
       )}
       <div
-        className={`mt-6 max-w-xs lg:max-w-sm w-full mx-auto ${
+        className={`mt-6 px-2 max-w-xs lg:max-w-sm w-full mx-auto ${
           loading ? 'opacity-50' : 'opacity-100'
         }`}
       >
@@ -63,51 +79,66 @@ const RoomForm = () => {
             {error.message}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="w-full flex flex-col">
-          <label className="sr-only" htmlFor="roomName">
-            {createRoom ? 'Create a room' : 'Join a room'}
+        <div className="h-6 mb-2">
+          {createRoom && roomName && (
+            <div className="h-full">
+              <span className="font-semibold text-sm uppercase text-gray-500">
+                Room name
+              </span>
+              : <span className="text-blue-500">{urlify(roomName)}</span>
+            </div>
+          )}
+        </div>
+        <form onSubmit={handleSubmit} className="w-full">
+          <label
+            className="text-sm uppercase font-semibold tracking-wide text-gray-700"
+            htmlFor="identity"
+          >
+            Display name:
           </label>
-          <div className="flex flex-col w-full items-center px-2 max-w-screen-sm">
-            <div className="w-full h-6 mb-1">
-              {createRoom && roomName && (
-                <div className="h-full">
-                  <span className="font-semibold text-xs uppercase text-gray-500">
-                    Room name
-                  </span>
-                  :{' '}
-                  <span className="text-sm text-blue-500">
-                    {urlify(roomName)}
-                  </span>
-                </div>
-              )}
-            </div>
-            <input
-              disabled={loading}
-              value={roomName}
-              onChange={handleRoomNameInputChange}
-              className={`w-full rounded py-2 px-4 bg-gray-100 border focus:outline-none focus:shadow-outline ${
-                error ? 'border-red-500' : 'border-gray-300'
-              }`}
-              type="text"
-              id="roomName"
-              name="roomName"
-              placeholder="Enter the room name"
-            />
-            {error?.roomName && (
-              <div className="w-full text-sm text-red-500">
-                {error.roomName}
-              </div>
-            )}
-            <div className="mx-auto mt-2">
-              <button
-                disabled={loading}
-                type="submit"
-                className="py-2 sm:py-3 px-4 sm:px-6 mt-4 bg-blue-500 hover:bg-blue-400 active:bg-blue-600 focus:outline-none focus:shadow-outline text-white font-bold tracking-wider uppercase text-sm rounded-lg"
-              >
-                {createRoom ? 'Create a room' : 'Join a room'}
-              </button>
-            </div>
-          </div>
+          <input
+            disabled={loading}
+            value={identity}
+            onChange={handleIdentityChange}
+            className={`w-full rounded py-2 px-4 bg-gray-100 border focus:outline-none focus:shadow-outline ${
+              error && error.identity ? 'border-red-500' : 'border-gray-300'
+            }`}
+            type="text"
+            id="identity"
+            name="identity"
+            placeholder="Enter your display name"
+          />
+          {error && error.identity && (
+            <div className="w-full text-sm text-red-500">{error.identity}</div>
+          )}
+          <label
+            className="block mt-2 text-sm uppercase font-semibold tracking-wide text-gray-700"
+            htmlFor="roomName"
+          >
+            Room name
+          </label>
+          <input
+            disabled={loading}
+            value={roomName}
+            onChange={handleRoomNameChange}
+            className={`w-full rounded py-2 px-4 bg-gray-100 border focus:outline-none focus:shadow-outline ${
+              error && error.roomName ? 'border-red-500' : 'border-gray-300'
+            }`}
+            type="text"
+            id="roomName"
+            name="roomName"
+            placeholder="Enter the room name"
+          />
+          {error && error.roomName && (
+            <div className="w-full text-sm text-red-500">{error.roomName}</div>
+          )}
+          <button
+            disabled={loading}
+            type="submit"
+            className="block mx-auto py-2 sm:py-3 px-4 sm:px-6 mt-4 bg-blue-500 hover:bg-blue-400 active:bg-blue-600 focus:outline-none focus:shadow-outline text-white font-bold tracking-wider uppercase text-sm rounded-lg shadow-md"
+          >
+            {createRoom ? 'Create a room' : 'Join a room'}
+          </button>
         </form>
         <div className="text-center mt-4">
           <p>

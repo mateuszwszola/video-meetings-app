@@ -1,11 +1,11 @@
 import client from './api-client';
 
-function createRoom(roomName) {
-  return client('room', { body: { roomName } });
+function createRoom(body) {
+  return client('room/create', { body });
 }
 
-function getRoom(roomName) {
-  return client(`room/${roomName}`);
+function joinRoom(body) {
+  return client('room/join', { body });
 }
 
-export { createRoom, getRoom };
+export { createRoom, joinRoom };
