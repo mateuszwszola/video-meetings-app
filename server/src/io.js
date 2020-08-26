@@ -1,8 +1,8 @@
 const socketIo = require('socket.io');
 const debug = require('debug')('io');
-const RoomService = require('./services/room');
-
-const RoomServiceInstance = new RoomService();
+const Room = require('./models/Room');
+const wrap = require('./utils/ioMiddlewareWrapper');
+const { jwtCheck } = require('./utils/auth');
 
 let io = null;
 
@@ -15,13 +15,24 @@ const rooms = new Map();
 exports.initialize = function (server) {
   io = socketIo(server);
 
+  io.use(wrap(jwtCheck));
+
+  io.use((socket, next) => {
+    if (socket.request.user) {
+      console.log(socket.request.user);
+    }
+    next();
+  });
+
   io.on('connection', (socket) => {
     debug(`A user connected with ${socket.id}`);
 
     socket.on('disconnecting', () => {
       debug(`A user disconnected with ${socket.id}`);
 
-      Object.keys(socket.rooms).forEach(async (room) => {
+      const socketRooms = Object.keys(socket.rooms);
+
+      socketRooms.forEach(async (room) => {
         if (room === socket.id) return;
 
         socket.to(room).emit('USER_DISCONNECTED', socket.id);
@@ -36,14 +47,14 @@ exports.initialize = function (server) {
           In case no one owns the room, choose new owner
         */
         try {
-          const { room: dbRoom } = await RoomServiceInstance.getRoom(room);
+          const dbRoom = await Room.findOne({ name: room }).exec();
 
           const roomExists = !!dbRoom,
             roomHasOwner = !!(dbRoom && dbRoom.owner);
 
           if (roomUsers.length <= 1) {
             if (roomExists && !roomHasOwner) {
-              await RoomServiceInstance.deleteRoom(room);
+              await Room.findByIdAndDelete(dbRoom.id);
             }
           } else if (!roomExists || (roomExists && !roomHasOwner)) {
             if (roomUsers[0] === socket.id) {
@@ -64,7 +75,9 @@ exports.initialize = function (server) {
     socket.on('JOIN_ROOM_REQUEST', ({ roomName, username = '' }) => {
       const roomUsers = rooms.get(roomName);
 
-      if (roomUsers && roomUsers.length > 0) {
+      if (roomUsers && roomUsers.length >= 3) {
+        socket.emit('JOIN_ROOM_DECLINE');
+      } else if (roomUsers && roomUsers.length > 0) {
         io.to(roomUsers[0]).emit('JOIN_ROOM_REQUEST', {
           id: socket.id,
           username,

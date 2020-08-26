@@ -6,7 +6,7 @@ const apiRoutes = require('./routes');
 const { handleNotFound, handleError } = require('./utils/error');
 const config = require('./config');
 const app = express();
-const jwtCheck = require('./utils/jwt-check');
+const { jwtCheck } = require('./utils/auth');
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

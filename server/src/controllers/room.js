@@ -1,64 +1,60 @@
-const RoomService = require('../services/room');
+const Room = require('../models/Room');
 const { ErrorHandler } = require('../utils/error');
 const urlify = require('../utils/urlify');
+const { generateNewToken, generateRandomId } = require('../utils/auth');
 
-const RoomServiceInstance = new RoomService();
+exports.joinRoom = async (req, res) => {
+  if (!req.body.roomName) {
+    throw new ErrorHandler(422, 'Room name is required');
+  }
 
-exports.getRoom = async (req, res) => {
-  const { roomName } = req.params;
+  if (!req.body.identity) {
+    throw new ErrorHandler(422, 'Identity is required');
+  }
 
-  const { room } = await RoomServiceInstance.getRoom(roomName);
+  const { roomName, identity } = req.body;
 
-  if (!room) {
+  const doc = await Room.findOne({ name: roomName }).exec();
+
+  if (!doc) {
     throw new ErrorHandler(404, `Room ${roomName} does not exists`);
   }
 
-  res.json({ message: 'Room found', room });
+  const token = generateNewToken({
+    room: roomName,
+    identity,
+    uid: generateRandomId(),
+  });
+
+  return res.json({ token, room: doc });
 };
 
 exports.createRoom = async (req, res) => {
-  const { roomName } = req.body;
-
-  if (!roomName || roomName.length > 100) {
-    throw new ErrorHandler(422, 'Invalid room name');
+  if (!req.body.roomName) {
+    throw new ErrorHandler(422, 'Room name is required');
   }
 
-  const { room } = await RoomServiceInstance.getRoom(urlify(roomName));
+  if (!req.body.identity) {
+    throw new ErrorHandler(422, 'Identity is required');
+  }
 
-  if (room) {
+  const { roomName, identity } = req.body;
+
+  const doc = await Room.findOne({ name: urlify(roomName) }).exec();
+
+  if (doc) {
     throw new ErrorHandler(400, `Room ${roomName} already in use`);
   }
 
-  const { room: createdRoom } = await RoomServiceInstance.createRoom({
-    name: urlify(roomName),
+  const uid = generateRandomId();
+
+  const room = await Room.create({ name: urlify(roomName), owner: uid });
+
+  const token = generateNewToken({
+    room: roomName,
+    identity,
+    uid,
   });
 
-  res.json({ message: `Room ${createdRoom.name} created`, room: createdRoom });
-};
-
-exports.createAndSaveRoom = async (req, res) => {
-  const { roomName } = req.body;
-
-  if (!roomName || roomName.length > 100) {
-    throw new ErrorHandler(422, 'Invalid room name');
-  }
-
-  const { room } = await RoomServiceInstance.getRoom(roomName);
-
-  if (room) {
-    throw new ErrorHandler(400, `Room ${roomName} already in use`);
-  }
-
-  const userId = (req.user.sub && req.user.sub.split('|')[1]) || null;
-
-  if (!userId) {
-    throw new ErrorHandler(401, 'not authorized');
-  }
-
-  const { room: createdRoom } = await RoomServiceInstance.createRoom({
-    name: urlify(roomName),
-    owner: userId,
-  });
-
-  return res.json({ room: createdRoom });
+  return res.json({ token, room });
 };

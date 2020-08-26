@@ -10,8 +10,6 @@ module.exports = {
   corsOrigin: process.env.CORS_ORIGIN,
   jwt: {
     secret: process.env.JWT_SECRET,
-    audience: process.env.JWT_AUDIENCE,
-    issuer: process.env.JWT_ISSUER,
     algorithms: ['HS256'],
   },
 };
