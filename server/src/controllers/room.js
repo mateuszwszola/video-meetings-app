@@ -51,7 +51,7 @@ exports.createRoom = async (req, res) => {
   const room = await Room.create({ name: urlify(roomName), owner: uid });
 
   const token = generateNewToken({
-    room: roomName,
+    room: urlify(roomName),
     identity,
     uid,
   });

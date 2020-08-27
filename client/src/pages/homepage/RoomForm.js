@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import * as roomClient from 'utils/room-client';
-import Loading from 'components/Loading';
 import urlify from 'utils/urlify';
 import useRoom from 'hooks/useRoom';
+import Loading from 'components/Loading';
 
 const RoomForm = () => {
   const history = useHistory();
@@ -12,7 +12,7 @@ const RoomForm = () => {
   const [roomName, setRoomName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { state, dispatch } = useRoom();
+  const { dispatch } = useRoom();
 
   const toggleEnterRoom = () => {
     setCreateRoom((prevState) => !prevState);
@@ -51,9 +51,8 @@ const RoomForm = () => {
 
     submit({ roomName, identity })
       .then((res) => {
-        dispatch({ type: 'join_room', identity, roomName });
+        dispatch({ type: 'join_room', identity, roomName, token: res.token });
         history.push('/' + res.room.name);
-        console.log(res);
       })
       .catch((err) => {
         setError(err);
@@ -63,7 +62,6 @@ const RoomForm = () => {
 
   return (
     <>
-      <pre>{JSON.stringify(state, null, 2)}</pre>
       {loading && (
         <div className="absolute inset-0 z-40">
           <Loading />

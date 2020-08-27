@@ -5,8 +5,20 @@ const config = require('../config');
 
 const generateNewToken = (data) =>
   jsonwebtoken.sign(data, config.jwt.secret, {
-    expiresIn: '3h',
+    expiresIn: '24h',
   });
+
+const verifyToken = (token) => {
+  return new Promise((resolve, reject) => {
+    jsonwebtoken.verify(token, config.jwt.secret, (err, payload) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(payload);
+      }
+    });
+  });
+};
 
 const jwtCheck = expressJwt({
   ...config.jwt,
@@ -18,4 +30,5 @@ module.exports = {
   jwtCheck,
   generateNewToken,
   generateRandomId,
+  verifyToken,
 };

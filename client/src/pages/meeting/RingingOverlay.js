@@ -16,10 +16,10 @@ function RingingOverlay({ ringingUser, handleAccept, handleDecline }) {
     }
   }
 
-  const username = ringingUser?.username || 'anonymous user';
+  const username = ringingUser?.identity || 'new user';
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-95">
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-95 z-10">
       <div className="w-full h-full flex flex-col justify-center items-center">
         <div className="bg-gray-900 rounded-full p-12 sm:p-20 shadow-2xl">
           <svg
@@ -39,7 +39,7 @@ function RingingOverlay({ ringingUser, handleAccept, handleDecline }) {
             <button
               onClick={handleDecline}
               type="button"
-              className="p-3 rounded-full bg-red-500 shadow-2xl focus:outline-none focus:shadow-outline"
+              className="p-3 rounded-full bg-red-500 shadow-2xl focus:outline-none focus:shadow-outline z-20"
             >
               <svg
                 viewBox="0 0 20 20"
@@ -55,7 +55,7 @@ function RingingOverlay({ ringingUser, handleAccept, handleDecline }) {
             <button
               onClick={handleAccept}
               type="button"
-              className="p-3 rounded-full bg-green-500 shadow-2xl focus:outline-none focus:shadow-outline"
+              className="p-3 rounded-full bg-green-500 shadow-2xl focus:outline-none focus:shadow-outline z-20"
             >
               <svg
                 viewBox="0 0 20 20"

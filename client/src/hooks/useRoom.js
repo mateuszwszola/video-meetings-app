@@ -3,6 +3,7 @@ import React, { createContext, useContext, useReducer } from 'react';
 const initialState = {
   identity: null,
   roomName: null,
+  token: null,
 };
 
 const reducer = (state, action) => {
@@ -11,6 +12,7 @@ const reducer = (state, action) => {
       ...state,
       identity: action.identity,
       roomName: action.roomName,
+      token: action.token,
     };
   } else {
     return initialState;

@@ -7,6 +7,7 @@ import RemoteVideo from 'pages/meeting/RemoteVideo';
 import RingingOverlay from 'pages/meeting/RingingOverlay';
 import Loading from 'components/Loading';
 import Layout from 'components/Layout';
+import useRoom from 'hooks/useRoom';
 
 function Meeting() {
   const { roomName } = useParams();
@@ -19,65 +20,82 @@ function Meeting() {
   const [isOwner, setIsOwner] = useState(false);
   const [ringingUser, setRingingUser] = useState(null);
   const [ringing, setRinging] = useState(true);
+  const { state } = useRoom();
 
   useEffect(() => {
     const socket = initiateSocket();
 
-    openUserMedia()
-      .then((mediaStream) => {
-        localMediaStreamRef.current = mediaStream;
-        localVideoRef.current.srcObject = mediaStream;
+    socket.on('connect', () => {
+      socket
+        .emit('authenticate', { token: state?.token })
+        .on('authenticated', () => {
+          openUserMedia()
+            .then((mediaStream) => {
+              localMediaStreamRef.current = mediaStream;
+              localVideoRef.current.srcObject = mediaStream;
 
-        socket.emit('JOIN_ROOM_REQUEST', { roomName });
+              socket.emit('JOIN_ROOM_REQUEST');
 
-        socket.on('JOIN_ROOM_REQUEST', (user) => {
-          console.log('JOIN_ROOM_REQUEST triggered', user);
-          setRingingUser(user);
+              socket.on('JOIN_ROOM_REQUEST', (user) => {
+                console.log('JOIN_ROOM_REQUEST triggered', user);
+                setRingingUser(user);
+              });
+
+              socket.on('JOIN_ROOM_ACCEPT', () => {
+                console.log('JOIN_ROOM_ACCEPT triggered');
+                setRinging(false);
+                socket.emit('JOIN_ROOM');
+              });
+
+              socket.on('JOIN_ROOM_DECLINE', () => {
+                console.log('JOIN_ROOM_DECLINE triggered');
+                leaveRoom();
+              });
+
+              socket.on('RECIPIENT', (recipientsIds) => {
+                console.log('RECIPIENT triggered', recipientsIds);
+                callUsers(recipientsIds);
+              });
+
+              socket.on('OWNER', () => {
+                console.log('OWNER event triggered');
+                setIsOwner(true);
+              });
+
+              socket.on('USER_JOINED', ({ id, identity }) => {
+                console.log(`USER_JOINED event triggered for ${identity}`);
+              });
+
+              socket.on('USER_DISCONNECTED', ({ id, identity }) => {
+                console.log(
+                  `USER_DISCONNECTED event triggered for ${identity}`
+                );
+                handleCloseConnection(id);
+              });
+
+              socket.on('HANG_UP', () => {
+                leaveRoom();
+              });
+
+              socket.on('OFFER', handleOfferReceive);
+
+              socket.on('ANSWER', handleAnswerReceive);
+
+              socket.on('NEW_ICE_CANDIDATE', handleNewICECandidate);
+
+              socket.on('error', (reason) => {
+                console.error(reason);
+              });
+
+              socketRef.current = socket;
+            })
+            .catch(handleGetUserMediaError);
+        })
+        .on('unauthorized', (msg) => {
+          console.log(`unauthorized: ${JSON.stringify(msg.data)}`);
+          // TODO: reidrect user to homepage, fill the roomName with this room
         });
-
-        socket.on('JOIN_ROOM_ACCEPT', () => {
-          console.log('JOIN_ROOM_ACCEPT triggered');
-          setRinging(false);
-          socket.emit('JOIN_ROOM', { roomName });
-        });
-
-        socket.on('JOIN_ROOM_DECLINE', () => {
-          console.log('JOIN_ROOM_DECLINE triggered');
-          leaveRoom();
-        });
-
-        socket.on('RECIPIENT', (recipientsIds) => {
-          console.log('RECIPIENT triggered', recipientsIds);
-          callUsers(recipientsIds);
-        });
-
-        socket.on('OWNER', () => {
-          console.log('OWNER event triggered');
-          setIsOwner(true);
-        });
-
-        socket.on('USER_JOINED', (userId) => {
-          console.log(`USER_JOINED event triggered for ${userId}`);
-        });
-
-        socket.on('USER_DISCONNECTED', (userId) => {
-          console.log(`USER_DISCONNECTED event triggered for ${userId}`);
-          handleCloseConnection(userId);
-        });
-
-        socket.on('HANG_UP', () => {
-          leaveRoom();
-        });
-
-        socket.on('OFFER', handleOfferReceive);
-
-        socket.on('ANSWER', handleAnswerReceive);
-
-        socket.on('NEW_ICE_CANDIDATE', handleNewICECandidate);
-
-        socketRef.current = socket;
-      })
-      .catch(handleGetUserMediaError);
+    });
 
     return () => {
       const events = [
@@ -294,7 +312,7 @@ function Meeting() {
   function handleHangUp() {
     if (!socketRef.current || !isOwner) return;
 
-    socketRef.current.emit('HANG_UP', { roomName });
+    socketRef.current.emit('HANG_UP');
 
     leaveRoom();
   }

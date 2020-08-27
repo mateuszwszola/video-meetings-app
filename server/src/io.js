@@ -1,8 +1,8 @@
 const socketIo = require('socket.io');
 const debug = require('debug')('io');
-const Room = require('./models/Room');
-const wrap = require('./utils/ioMiddlewareWrapper');
-const { jwtCheck } = require('./utils/auth');
+const RoomModel = require('./models/Room');
+const socketioJwt = require('socketio-jwt');
+const config = require('./config');
 
 let io = null;
 
@@ -10,138 +10,128 @@ exports.io = function () {
   return io;
 };
 
-const rooms = new Map();
+// ROOMS keeps track of users connected to a room
+const ROOMS = new Map();
 
 exports.initialize = function (server) {
   io = socketIo(server);
 
-  io.use(wrap(jwtCheck));
+  io.sockets
+    .on(
+      'connection',
+      socketioJwt.authorize({
+        secret: config.jwt.secret,
+        callback: 15000,
+      })
+    )
+    .on('authenticated', (socket) => {
+      const user = socket.decoded_token;
 
-  io.use((socket, next) => {
-    if (socket.request.user) {
-      console.log(socket.request.user);
-    }
-    next();
-  });
+      debug(`A user with '${user.identity}' identity connected`);
 
-  io.on('connection', (socket) => {
-    debug(`A user connected with ${socket.id}`);
+      socket.on('disconnecting', () => {
+        debug(`A user with ${user.identity} identity disconnected`);
 
-    socket.on('disconnecting', () => {
-      debug(`A user disconnected with ${socket.id}`);
+        const socketRooms = Object.keys(socket.rooms);
 
-      const socketRooms = Object.keys(socket.rooms);
+        socketRooms.forEach(async (room) => {
+          if (room === socket.id) return;
 
-      socketRooms.forEach(async (room) => {
-        if (room === socket.id) return;
+          socket.to(room).emit('USER_DISCONNECTED', {
+            id: socket.id,
+            identity: user.identity,
+          });
 
-        socket.to(room).emit('USER_DISCONNECTED', socket.id);
+          if (!ROOMS.has(room)) return;
 
-        if (!rooms.has(room)) return;
-
-        const roomUsers = rooms.get(room);
-        /*
-          There is no users in that room, delete the record from db
-          to allow other users to create a room with that name.
-          But make sure no one owns that room.
-          In case no one owns the room, choose new owner
-        */
-        try {
-          const dbRoom = await Room.findOne({ name: room }).exec();
-
-          const roomExists = !!dbRoom,
-            roomHasOwner = !!(dbRoom && dbRoom.owner);
-
-          if (roomUsers.length <= 1) {
-            if (roomExists && !roomHasOwner) {
-              await Room.findByIdAndDelete(dbRoom.id);
-            }
-          } else if (!roomExists || (roomExists && !roomHasOwner)) {
-            if (roomUsers[0] === socket.id) {
-              io.to(roomUsers[1]).emit('OWNER');
-            }
+          const roomSockets = ROOMS.get(room);
+          /*
+            There is about to be no users in that room, delete the record from DB
+            to allow other users to create a room with that name.
+          */
+          if (roomSockets.length === 1) {
+            RoomModel.findOneAndDelete({ name: room })
+              .exec()
+              .catch((err) => {
+                console.error(err);
+              });
           }
-        } catch (err) {
-          console.error(err);
+
+          ROOMS.set(
+            room,
+            ROOMS.get(room).filter((id) => id !== socket.id)
+          );
+        });
+      });
+
+      socket.on('JOIN_ROOM_REQUEST', () => {
+        const roomSockets = ROOMS.get(user.room);
+
+        if (roomSockets && roomSockets.length >= 3) {
+          socket.emit('JOIN_ROOM_DECLINE');
+        } else if (roomSockets && roomSockets.length > 0) {
+          io.to(roomSockets[0]).emit('JOIN_ROOM_REQUEST', {
+            id: socket.id,
+            identity: user.identity,
+          });
+        } else {
+          socket.emit('JOIN_ROOM_ACCEPT');
+        }
+      });
+
+      socket.on('JOIN_ROOM_ACCEPT', ({ id }) => {
+        io.to(id).emit('JOIN_ROOM_ACCEPT');
+      });
+
+      socket.on('JOIN_ROOM_DECLINE', ({ id }) => {
+        io.to(id).emit('JOIN_ROOM_DECLINE');
+      });
+
+      socket.on('JOIN_ROOM', () => {
+        debug(`JOIN_ROOM ${user.room} triggered for ${user.identity}`);
+
+        socket.join(user.room);
+
+        if (ROOMS.has(user.room)) {
+          ROOMS.set(user.room, [...ROOMS.get(user.room), socket.id]);
+        } else {
+          ROOMS.set(user.room, [socket.id]);
         }
 
-        rooms.set(
-          room,
-          rooms.get(room).filter((userId) => userId !== socket.id)
-        );
+        const roomSockets = ROOMS.get(user.room);
+
+        if (roomSockets.length === 1) {
+          socket.emit('OWNER');
+        }
+
+        const recipients = roomSockets.filter((id) => id !== socket.id);
+
+        if (recipients.length > 0) {
+          socket.emit('RECIPIENT', recipients);
+          socket
+            .to(user.room)
+            .emit('USER_JOINED', { id: socket.id, identity: user.identity });
+        }
+      });
+
+      socket.on('HANG_UP', () => {
+        const roomSockets = ROOMS.get(user.room);
+        const isOwner = roomSockets && roomSockets[0] === socket.id;
+        if (isOwner) {
+          socket.to(user.room).emit('HANG_UP');
+        }
+      });
+
+      socket.on('OFFER', (payload) => {
+        io.to(payload.target).emit('OFFER', payload);
+      });
+
+      socket.on('ANSWER', (payload) => {
+        io.to(payload.target).emit('ANSWER', payload);
+      });
+
+      socket.on('NEW_ICE_CANDIDATE', (payload) => {
+        io.to(payload.target).emit('NEW_ICE_CANDIDATE', payload);
       });
     });
-
-    socket.on('JOIN_ROOM_REQUEST', ({ roomName, username = '' }) => {
-      const roomUsers = rooms.get(roomName);
-
-      if (roomUsers && roomUsers.length >= 3) {
-        socket.emit('JOIN_ROOM_DECLINE');
-      } else if (roomUsers && roomUsers.length > 0) {
-        io.to(roomUsers[0]).emit('JOIN_ROOM_REQUEST', {
-          id: socket.id,
-          username,
-        });
-      } else {
-        socket.emit('JOIN_ROOM_ACCEPT');
-      }
-    });
-
-    socket.on('JOIN_ROOM_ACCEPT', ({ id }) => {
-      io.to(id).emit('JOIN_ROOM_ACCEPT');
-    });
-
-    socket.on('JOIN_ROOM_DECLINE', ({ id }) => {
-      io.to(id).emit('JOIN_ROOM_DECLINE');
-    });
-
-    socket.on('JOIN_ROOM', ({ roomName, username }) => {
-      debug(`JOIN_ROOM ${roomName} triggered for ${socket.id}`);
-
-      if (username) {
-        socket.username = username;
-      }
-
-      socket.join(roomName);
-
-      if (rooms.has(roomName)) {
-        rooms.set(roomName, [...rooms.get(roomName), socket.id]);
-      } else {
-        rooms.set(roomName, [socket.id]);
-      }
-
-      const roomUsers = rooms.get(roomName);
-
-      if (roomUsers.length === 1) {
-        socket.emit('OWNER');
-      }
-
-      const recipients = roomUsers.filter((userId) => userId !== socket.id);
-
-      if (recipients.length > 0) {
-        socket.emit('RECIPIENT', recipients);
-        socket.to(roomName).emit('USER_JOINED', socket.id);
-      }
-    });
-
-    socket.on('HANG_UP', ({ roomName }) => {
-      const roomUsers = rooms.get(roomName);
-      const isOwner = roomUsers && roomUsers[0] === socket.id;
-      if (isOwner) {
-        socket.to(roomName).emit('HANG_UP');
-      }
-    });
-
-    socket.on('OFFER', (payload) => {
-      io.to(payload.target).emit('OFFER', payload);
-    });
-
-    socket.on('ANSWER', (payload) => {
-      io.to(payload.target).emit('ANSWER', payload);
-    });
-
-    socket.on('NEW_ICE_CANDIDATE', (payload) => {
-      io.to(payload.target).emit('NEW_ICE_CANDIDATE', payload);
-    });
-  });
 };
