@@ -27,3 +27,4 @@ src/config.js
 .idea
 tailwindcss-config-full.js
 TODO
+.vercel
