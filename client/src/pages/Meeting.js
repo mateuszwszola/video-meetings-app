@@ -5,7 +5,6 @@ import { openUserMedia } from 'utils/webrtc';
 import { peerConfiguration } from 'config';
 import RemoteVideo from 'pages/meeting/RemoteVideo';
 import RingingOverlay from 'pages/meeting/RingingOverlay';
-import Loading from 'components/Loading';
 import Layout from 'components/Layout';
 import useRoom from 'hooks/useRoom';
 
@@ -17,9 +16,10 @@ function Meeting() {
   const localVideoRef = useRef(null);
   const peerConnectionsRef = useRef({});
   const [peerConnections, setPeerConnections] = useState([]);
+  const [users, setUsers] = useState({});
   const [isOwner, setIsOwner] = useState(false);
   const [ringingUser, setRingingUser] = useState(null);
-  const [ringing, setRinging] = useState(true);
+  const [calling, setCalling] = useState(true);
   const { state } = useRoom();
 
   useEffect(() => {
@@ -43,7 +43,7 @@ function Meeting() {
 
               socket.on('JOIN_ROOM_ACCEPT', () => {
                 console.log('JOIN_ROOM_ACCEPT triggered');
-                setRinging(false);
+                setCalling(false);
                 socket.emit('JOIN_ROOM');
               });
 
@@ -52,25 +52,29 @@ function Meeting() {
                 leaveRoom();
               });
 
-              socket.on('RECIPIENT', (recipientsIds) => {
-                console.log('RECIPIENT triggered', recipientsIds);
-                callUsers(recipientsIds);
+              socket.on('RECIPIENT', (recipients) => {
+                console.log('RECIPIENT triggered', recipients);
+                callUsers(recipients);
               });
 
               socket.on('OWNER', () => {
                 console.log('OWNER event triggered');
                 setIsOwner(true);
+                setCalling(false);
               });
 
-              socket.on('USER_JOINED', ({ id, identity }) => {
+              socket.on('USER_JOINED', ({ socketId, identity }) => {
                 console.log(`USER_JOINED event triggered for ${identity}`);
+                setUsers((u) => ({ ...u, [socketId]: identity }));
               });
 
-              socket.on('USER_DISCONNECTED', ({ id, identity }) => {
+              socket.on('USER_DISCONNECTED', ({ socketId, identity }) => {
                 console.log(
                   `USER_DISCONNECTED event triggered for ${identity}`
                 );
-                handleCloseConnection(id);
+                handleCloseConnection(socketId);
+                const { [socketId]: id, ...newUsers } = users;
+                setUsers(newUsers);
               });
 
               socket.on('HANG_UP', () => {
@@ -120,13 +124,14 @@ function Meeting() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName]);
 
-  function callUsers(remoteUsersIds) {
+  function callUsers(recipients) {
     const peers = [];
+    const identities = {};
 
     const localTracks = localMediaStreamRef.current.getTracks();
 
-    remoteUsersIds.forEach((userId) => {
-      const peer = createPeerConnection(userId);
+    recipients.forEach((user) => {
+      const peer = createPeerConnection(user.socketId);
 
       try {
         localTracks.forEach((track) =>
@@ -136,64 +141,67 @@ function Meeting() {
         handleGetUserMediaError(err);
       }
 
-      peerConnectionsRef.current[userId] = peer;
-      peers.push({ userId, peer });
+      peerConnectionsRef.current[user.socketId] = peer;
+      peers.push({ socketId: user.socketId, peer });
+      identities[user.socketId] = user.identity;
     });
 
     setPeerConnections(peers);
+    setUsers(identities);
   }
 
-  function createPeerConnection(userId) {
+  function createPeerConnection(socketId) {
     const peer = new RTCPeerConnection(peerConfiguration);
 
-    peer.onicecandidate = (e) => handleICECandidateEvent(e, userId);
-    peer.onnegotiationneeded = (e) => handleNegotiationNeededEvent(e, userId);
+    peer.onicecandidate = (e) => handleICECandidateEvent(e, socketId);
+    peer.onnegotiationneeded = (e) => handleNegotiationNeededEvent(e, socketId);
     peer.oniceconnectionstatechange = (e) =>
-      handleICEConnectionStateChangeEvent(e, userId);
+      handleICEConnectionStateChangeEvent(e, socketId);
 
     return peer;
   }
 
-  async function handleNegotiationNeededEvent(e, userId) {
-    if (!peerConnectionsRef.current[userId]) return;
+  async function handleNegotiationNeededEvent(e, socketId) {
+    if (!peerConnectionsRef.current[socketId]) return;
 
     try {
-      const offer = await peerConnectionsRef.current[userId].createOffer();
+      const offer = await peerConnectionsRef.current[socketId].createOffer();
 
-      if (peerConnectionsRef.current[userId].signalingState !== 'stable') {
+      if (peerConnectionsRef.current[socketId].signalingState !== 'stable') {
         return;
       }
 
-      await peerConnectionsRef.current[userId].setLocalDescription(offer);
+      await peerConnectionsRef.current[socketId].setLocalDescription(offer);
 
       socketRef.current.emit('OFFER', {
-        target: userId,
+        target: socketId,
         caller: socketRef.current.id,
-        sdp: peerConnectionsRef.current[userId].localDescription,
+        sdp: peerConnectionsRef.current[socketId].localDescription,
       });
     } catch (error) {
       console.error(error);
     }
   }
 
-  function handleICECandidateEvent(e, userId) {
+  function handleICECandidateEvent(e, socketId) {
     if (e.candidate) {
       socketRef.current.emit('NEW_ICE_CANDIDATE', {
-        target: userId,
+        target: socketId,
         caller: socketRef.current.id,
         candidate: e.candidate,
       });
     }
   }
 
-  function handleICEConnectionStateChangeEvent(e, userId) {
-    const currentState = peerConnectionsRef.current[userId].iceConnectionState;
+  function handleICEConnectionStateChangeEvent(e, socketId) {
+    const currentState =
+      peerConnectionsRef.current[socketId].iceConnectionState;
     if (
       currentState === 'closed' ||
       currentState === 'failed' ||
       currentState === 'disconnected'
     ) {
-      handleCloseConnection(userId);
+      handleCloseConnection(socketId);
     }
   }
 
@@ -217,7 +225,7 @@ function Meeting() {
       peerConnectionsRef.current[payload.caller] = peer;
       setPeerConnections((prevState) => [
         ...prevState,
-        { userId: payload.caller, peer },
+        { socketId: payload.caller, peer },
       ]);
     }
 
@@ -263,17 +271,17 @@ function Meeting() {
     localMediaStreamRef.current = null;
   }
 
-  function handleCloseConnection(userId) {
-    if (!peerConnectionsRef.current[userId]) return;
+  function handleCloseConnection(socketId) {
+    if (!peerConnectionsRef.current[socketId]) return;
 
-    peerConnectionsRef.current[userId].ontrack = null;
-    peerConnectionsRef.current[userId].onicecandidate = null;
-    peerConnectionsRef.current[userId].onnegotiationneeded = null;
-    peerConnectionsRef.current[userId].onremovetrack = null;
-    peerConnectionsRef.current[userId].oniceconnectionstatechange = null;
+    peerConnectionsRef.current[socketId].ontrack = null;
+    peerConnectionsRef.current[socketId].onicecandidate = null;
+    peerConnectionsRef.current[socketId].onnegotiationneeded = null;
+    peerConnectionsRef.current[socketId].onremovetrack = null;
+    peerConnectionsRef.current[socketId].oniceconnectionstatechange = null;
 
-    peerConnectionsRef.current[userId].close();
-    peerConnectionsRef.current[userId] = null;
+    peerConnectionsRef.current[socketId].close();
+    peerConnectionsRef.current[socketId] = null;
 
     /*
       When component unmounts, ICEConnectionStateChangeEvent will detect "disconnected" state,
@@ -283,7 +291,7 @@ function Meeting() {
     */
     if (socketRef.current) {
       setPeerConnections((prevState) => [
-        ...prevState.filter((peer) => peer.userId !== userId),
+        ...prevState.filter((peer) => peer.socketId !== socketId),
       ]);
     }
   }
@@ -319,20 +327,24 @@ function Meeting() {
 
   function handleJoinRoomAcceptClick() {
     if (!ringingUser) return;
-    socketRef.current.emit('JOIN_ROOM_ACCEPT', { id: ringingUser.id });
+    socketRef.current.emit('JOIN_ROOM_ACCEPT', {
+      socketId: ringingUser.socketId,
+    });
     setRingingUser(null);
   }
 
   function handleJoinRoomDeclineClick() {
     if (!ringingUser) return;
-    socketRef.current.emit('JOIN_ROOM_DECLINE', { id: ringingUser.id });
+    socketRef.current.emit('JOIN_ROOM_DECLINE', {
+      socketId: ringingUser.socketId,
+    });
     setRingingUser(null);
   }
 
   return (
     <Layout>
-      {!isOwner && ringing ? (
-        <Loading />
+      {!isOwner && calling ? (
+        <div>Waiting...</div>
       ) : ringingUser ? (
         <RingingOverlay
           ringingUser={ringingUser}
@@ -358,11 +370,12 @@ function Meeting() {
               playsInline
             />
           </div>
-          {peerConnections.map(({ userId, peer }) => (
-            <div key={userId} className="w-full sm:w-1/2 mx-auto p-2">
+          {peerConnections.map(({ socketId, peer }) => (
+            <div key={socketId} className="w-full sm:w-1/2 mx-auto p-2">
               <RemoteVideo
                 peer={peer}
-                closeConnection={() => handleCloseConnection(userId)}
+                identity={users[socketId]}
+                closeConnection={() => handleCloseConnection(socketId)}
               />
             </div>
           ))}

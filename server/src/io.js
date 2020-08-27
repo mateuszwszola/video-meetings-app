@@ -38,18 +38,18 @@ exports.initialize = function (server) {
           if (room === socket.id) return;
 
           socket.to(room).emit('USER_DISCONNECTED', {
-            id: socket.id,
+            socketId: socket.id,
             identity: user.identity,
           });
 
           if (!ROOMS.has(room)) return;
 
-          const roomSockets = ROOMS.get(room);
+          const roomUsers = ROOMS.get(room);
           /*
             There is about to be no users in that room, delete the record from DB
             to allow other users to create a room with that name.
           */
-          if (roomSockets.length === 1) {
+          if (roomUsers.length === 1) {
             RoomModel.findOneAndDelete({ name: room })
               .exec()
               .catch((err) => {
@@ -59,19 +59,19 @@ exports.initialize = function (server) {
 
           ROOMS.set(
             room,
-            ROOMS.get(room).filter((id) => id !== socket.id)
+            ROOMS.get(room).filter((user) => user.socketId !== socket.id)
           );
         });
       });
 
       socket.on('JOIN_ROOM_REQUEST', () => {
-        const roomSockets = ROOMS.get(user.room);
+        const roomUsers = ROOMS.get(user.room);
 
-        if (roomSockets && roomSockets.length >= 3) {
+        if (roomUsers && roomUsers.length >= 3) {
           socket.emit('JOIN_ROOM_DECLINE');
-        } else if (roomSockets && roomSockets.length > 0) {
-          io.to(roomSockets[0]).emit('JOIN_ROOM_REQUEST', {
-            id: socket.id,
+        } else if (roomUsers && roomUsers.length > 0) {
+          io.to(roomUsers[0].socketId).emit('JOIN_ROOM_REQUEST', {
+            socketId: socket.id,
             identity: user.identity,
           });
         } else {
@@ -79,12 +79,12 @@ exports.initialize = function (server) {
         }
       });
 
-      socket.on('JOIN_ROOM_ACCEPT', ({ id }) => {
-        io.to(id).emit('JOIN_ROOM_ACCEPT');
+      socket.on('JOIN_ROOM_ACCEPT', ({ socketId }) => {
+        io.to(socketId).emit('JOIN_ROOM_ACCEPT');
       });
 
-      socket.on('JOIN_ROOM_DECLINE', ({ id }) => {
-        io.to(id).emit('JOIN_ROOM_DECLINE');
+      socket.on('JOIN_ROOM_DECLINE', ({ socketId }) => {
+        io.to(socketId).emit('JOIN_ROOM_DECLINE');
       });
 
       socket.on('JOIN_ROOM', () => {
@@ -93,30 +93,39 @@ exports.initialize = function (server) {
         socket.join(user.room);
 
         if (ROOMS.has(user.room)) {
-          ROOMS.set(user.room, [...ROOMS.get(user.room), socket.id]);
+          ROOMS.set(user.room, [
+            ...ROOMS.get(user.room),
+            { socketId: socket.id, identity: user.identity },
+          ]);
         } else {
-          ROOMS.set(user.room, [socket.id]);
+          ROOMS.set(user.room, [
+            { socketId: socket.id, identity: user.identity },
+          ]);
         }
 
-        const roomSockets = ROOMS.get(user.room);
+        const roomUsers = ROOMS.get(user.room);
 
-        if (roomSockets.length === 1) {
+        if (roomUsers.length === 1) {
           socket.emit('OWNER');
         }
 
-        const recipients = roomSockets.filter((id) => id !== socket.id);
+        const recipients = roomUsers.filter(
+          (user) => user.socketId !== socket.id
+        );
 
         if (recipients.length > 0) {
           socket.emit('RECIPIENT', recipients);
-          socket
-            .to(user.room)
-            .emit('USER_JOINED', { id: socket.id, identity: user.identity });
+          socket.to(user.room).emit('USER_JOINED', {
+            socketId: socket.id,
+            identity: user.identity,
+          });
         }
       });
 
       socket.on('HANG_UP', () => {
-        const roomSockets = ROOMS.get(user.room);
-        const isOwner = roomSockets && roomSockets[0] === socket.id;
+        const roomUsers = ROOMS.get(user.room);
+        const isOwner =
+          roomUsers && roomUsers[0] && roomUsers[0].socketId === socket.id;
         if (isOwner) {
           socket.to(user.room).emit('HANG_UP');
         }

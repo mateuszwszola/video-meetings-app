@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-function RemoteVideo({ peer, closeConnection }) {
+function RemoteVideo({ peer, closeConnection, identity }) {
   const videoRef = useRef(null);
 
   useEffect(() => {
@@ -23,7 +23,15 @@ function RemoteVideo({ peer, closeConnection }) {
   }, [peer, closeConnection]);
 
   return (
-    <video ref={videoRef} autoPlay playsInline className="w-full max-w-full" />
+    <>
+      <p>Identity: {identity}</p>
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        className="w-full max-w-full"
+      />
+    </>
   );
 }
 
