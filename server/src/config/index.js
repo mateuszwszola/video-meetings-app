@@ -6,7 +6,7 @@ module.exports = {
   isTest: env === 'test',
   isProd: env === 'production',
   port: process.env.PORT || 3001,
-  dbUrl: process.env.DB_URL,
+  dbUrl: process.env.MONGODB_URI,
   corsOrigin: process.env.CORS_ORIGIN,
   jwt: {
     secret: process.env.JWT_SECRET,
