@@ -7,12 +7,12 @@ import Loading from 'components/Loading';
 
 const RoomForm = () => {
   const history = useHistory();
-  const [createRoom, setCreateRoom] = useState(true);
+  const { state, dispatch } = useRoom();
+  const [roomName, setRoomName] = useState(state?.roomName || '');
   const [identity, setIdentity] = useState('');
-  const [roomName, setRoomName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { dispatch } = useRoom();
+  const [createRoom, setCreateRoom] = useState(!state?.roomName);
 
   const toggleEnterRoom = () => {
     setCreateRoom((prevState) => !prevState);

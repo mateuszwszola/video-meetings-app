@@ -10,7 +10,7 @@ exports.io = function () {
   return io;
 };
 
-// ROOMS keeps track of users connected to a room
+// ROOMS map keeps track of users connected to a room
 const ROOMS = new Map();
 
 exports.initialize = function (server) {
@@ -92,15 +92,12 @@ exports.initialize = function (server) {
 
         socket.join(user.room);
 
+        const newUser = { socketId: socket.id, identity: user.identity };
+
         if (ROOMS.has(user.room)) {
-          ROOMS.set(user.room, [
-            ...ROOMS.get(user.room),
-            { socketId: socket.id, identity: user.identity },
-          ]);
+          ROOMS.set(user.room, [...ROOMS.get(user.room), newUser]);
         } else {
-          ROOMS.set(user.room, [
-            { socketId: socket.id, identity: user.identity },
-          ]);
+          ROOMS.set(user.room, [newUser]);
         }
 
         const roomUsers = ROOMS.get(user.room);

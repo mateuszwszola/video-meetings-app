@@ -23,15 +23,17 @@ function RemoteVideo({ peer, closeConnection, identity }) {
   }, [peer, closeConnection]);
 
   return (
-    <>
-      <p>Identity: {identity}</p>
+    <div className="relative">
+      <div className="absolute bottom-0 left-0 px-2 py-1 bg-black bg-opacity-95 text-white tracking-wide">
+        {identity}
+      </div>
       <video
         ref={videoRef}
         autoPlay
         playsInline
         className="w-full max-w-full"
       />
-    </>
+    </div>
   );
 }
 

@@ -20,7 +20,7 @@ function Meeting() {
   const [isOwner, setIsOwner] = useState(false);
   const [ringingUser, setRingingUser] = useState(null);
   const [calling, setCalling] = useState(true);
-  const { state } = useRoom();
+  const { state, dispatch } = useRoom();
 
   useEffect(() => {
     const socket = initiateSocket();
@@ -73,8 +73,7 @@ function Meeting() {
                   `USER_DISCONNECTED event triggered for ${identity}`
                 );
                 handleCloseConnection(socketId);
-                const { [socketId]: id, ...newUsers } = users;
-                setUsers(newUsers);
+                setUsers(({ [socketId]: id, ...newUsers }) => newUsers);
               });
 
               socket.on('HANG_UP', () => {
@@ -97,12 +96,16 @@ function Meeting() {
         })
         .on('unauthorized', (msg) => {
           console.log(`unauthorized: ${JSON.stringify(msg.data)}`);
-          // TODO: reidrect user to homepage, fill the roomName with this room
+          dispatch({ type: 'update_room', roomName });
+          history.replace({ pathname: '/' });
         });
     });
 
     return () => {
       const events = [
+        'connect',
+        'authenticated',
+        'unauthorized',
         'JOIN_ROOM_ACCEPT',
         'JOIN_ROOM_DECLINE',
         'JOIN_ROOM_REQUEST',
@@ -314,7 +317,8 @@ function Meeting() {
   }
 
   function leaveRoom() {
-    history.push('/');
+    dispatch({ type: 'update_room', roomName: null });
+    history.replace({ pathname: '/' });
   }
 
   function handleHangUp() {

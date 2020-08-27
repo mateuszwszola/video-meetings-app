@@ -14,6 +14,11 @@ const reducer = (state, action) => {
       roomName: action.roomName,
       token: action.token,
     };
+  } else if (action.type === 'update_room') {
+    return {
+      ...state,
+      roomName: action.roomName,
+    };
   } else {
     return initialState;
   }
