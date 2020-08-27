@@ -314,6 +314,8 @@ function Meeting() {
         'Error opening your camera and/or microphone: ' + e.message
       );
     }
+
+    leaveRoom();
   }
 
   function leaveRoom() {
