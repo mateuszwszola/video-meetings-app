@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
 import { initiateSocket, disconnectSocket } from 'utils/socket';
-import { openUserMedia } from 'utils/webrtc';
-import { peerConfiguration } from 'config';
+import { openUserMedia, getPeerConfiguration } from 'utils/webrtc';
+import useRoom from 'hooks/useRoom';
 import RemoteVideo from 'pages/meeting/RemoteVideo';
 import RingingOverlay from 'pages/meeting/RingingOverlay';
 import Layout from 'components/Layout';
-import useRoom from 'hooks/useRoom';
 
 function Meeting() {
   const { roomName } = useParams();
@@ -21,78 +20,84 @@ function Meeting() {
   const [ringingUser, setRingingUser] = useState(null);
   const [calling, setCalling] = useState(true);
   const { state, dispatch } = useRoom();
+  const peerConfigurationRef = useRef({});
 
   useEffect(() => {
+    async function setPeerConfiguration() {
+      peerConfigurationRef.current = await getPeerConfiguration();
+    }
+
     const socket = initiateSocket();
 
     socket.on('connect', () => {
       socket
         .emit('authenticate', { token: state?.token })
-        .on('authenticated', () => {
-          openUserMedia()
-            .then((mediaStream) => {
-              localMediaStreamRef.current = mediaStream;
-              localVideoRef.current.srcObject = mediaStream;
+        .on('authenticated', async () => {
+          await setPeerConfiguration();
 
-              socket.emit('JOIN_ROOM_REQUEST');
+          try {
+            const mediaStream = await openUserMedia();
+            localMediaStreamRef.current = mediaStream;
+            localVideoRef.current.srcObject = mediaStream;
 
-              socket.on('JOIN_ROOM_REQUEST', (user) => {
-                console.log('JOIN_ROOM_REQUEST triggered', user);
-                setRingingUser(user);
-              });
+            socket.emit('JOIN_ROOM_REQUEST');
 
-              socket.on('JOIN_ROOM_ACCEPT', () => {
-                console.log('JOIN_ROOM_ACCEPT triggered');
-                setCalling(false);
-                socket.emit('JOIN_ROOM');
-              });
+            socket.on('JOIN_ROOM_REQUEST', (user) => {
+              console.log('JOIN_ROOM_REQUEST triggered', user);
+              setRingingUser(user);
+            });
 
-              socket.on('JOIN_ROOM_DECLINE', () => {
-                console.log('JOIN_ROOM_DECLINE triggered');
-                leaveRoom();
-              });
+            socket.on('JOIN_ROOM_ACCEPT', () => {
+              console.log('JOIN_ROOM_ACCEPT triggered');
+              setCalling(false);
+              socket.emit('JOIN_ROOM');
+            });
 
-              socket.on('RECIPIENT', (recipients) => {
-                console.log('RECIPIENT triggered', recipients);
-                callUsers(recipients);
-              });
+            socket.on('JOIN_ROOM_DECLINE', () => {
+              console.log('JOIN_ROOM_DECLINE triggered');
+              leaveRoom();
+            });
 
-              socket.on('OWNER', () => {
-                console.log('OWNER event triggered');
-                setIsOwner(true);
-                setCalling(false);
-              });
+            socket.on('RECIPIENT', (recipients) => {
+              console.log('RECIPIENT triggered', recipients);
+              callUsers(recipients);
+            });
 
-              socket.on('USER_JOINED', ({ socketId, identity }) => {
-                console.log(`USER_JOINED event triggered for ${identity}`);
-                setUsers((u) => ({ ...u, [socketId]: identity }));
-              });
+            socket.on('OWNER', () => {
+              console.log('OWNER event triggered');
+              setIsOwner(true);
+              setCalling(false);
+            });
 
-              socket.on('USER_DISCONNECTED', ({ socketId, identity }) => {
-                console.log(
-                  `USER_DISCONNECTED event triggered for ${identity}`
-                );
-                handleCloseConnection(socketId);
-                setUsers(({ [socketId]: id, ...newUsers }) => newUsers);
-              });
+            socket.on('USER_JOINED', ({ socketId, identity }) => {
+              console.log(`USER_JOINED event triggered for ${identity}`);
+              setUsers((u) => ({ ...u, [socketId]: identity }));
+            });
 
-              socket.on('HANG_UP', () => {
-                leaveRoom();
-              });
+            socket.on('USER_DISCONNECTED', ({ socketId, identity }) => {
+              console.log(`USER_DISCONNECTED event triggered for ${identity}`);
+              handleCloseConnection(socketId);
+              setUsers(({ [socketId]: id, ...newUsers }) => newUsers);
+            });
 
-              socket.on('OFFER', handleOfferReceive);
+            socket.on('HANG_UP', () => {
+              leaveRoom();
+            });
 
-              socket.on('ANSWER', handleAnswerReceive);
+            socket.on('OFFER', handleOfferReceive);
 
-              socket.on('NEW_ICE_CANDIDATE', handleNewICECandidate);
+            socket.on('ANSWER', handleAnswerReceive);
 
-              socket.on('error', (reason) => {
-                console.error(reason);
-              });
+            socket.on('NEW_ICE_CANDIDATE', handleNewICECandidate);
 
-              socketRef.current = socket;
-            })
-            .catch(handleGetUserMediaError);
+            socket.on('error', (reason) => {
+              console.error(reason);
+            });
+
+            socketRef.current = socket;
+          } catch (error) {
+            handleGetUserMediaError(error);
+          }
         })
         .on('unauthorized', (msg) => {
           console.log(`unauthorized: ${JSON.stringify(msg.data)}`);
@@ -102,27 +107,11 @@ function Meeting() {
     });
 
     return () => {
-      const events = [
-        'connect',
-        'authenticated',
-        'unauthorized',
-        'JOIN_ROOM_ACCEPT',
-        'JOIN_ROOM_DECLINE',
-        'JOIN_ROOM_REQUEST',
-        'RECIPIENT',
-        'OWNER',
-        'USER_JOINED',
-        'USER_DISCONNECTED',
-        'OFFER',
-        'ANSWER',
-        'NEW_ICE_CANDIDATE',
-      ];
-      events.forEach((event) => socket.off(event));
-      socketRef.current = null;
-
       handleCloseVideoCall();
 
-      disconnectSocket();
+      disconnectSocket(socketRef.current);
+
+      socketRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName]);
@@ -154,7 +143,7 @@ function Meeting() {
   }
 
   function createPeerConnection(socketId) {
-    const peer = new RTCPeerConnection(peerConfiguration);
+    const peer = new RTCPeerConnection(peerConfigurationRef.current);
 
     peer.onicecandidate = (e) => handleICECandidateEvent(e, socketId);
     peer.onnegotiationneeded = (e) => handleNegotiationNeededEvent(e, socketId);
@@ -314,8 +303,6 @@ function Meeting() {
         'Error opening your camera and/or microphone: ' + e.message
       );
     }
-
-    leaveRoom();
   }
 
   function leaveRoom() {
