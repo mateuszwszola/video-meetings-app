@@ -17,4 +17,4 @@ https://videoma.vercel.app/
 
 ## Author
 
-** Mateusz Wszola **
+**Mateusz Wszola**
